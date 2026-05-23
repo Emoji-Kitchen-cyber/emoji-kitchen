@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Emoji Kitchen Pro - Mix Emojis</title>
-  <meta name="description" content="Combine two emojis to create unique stickers using Google's Emoji Kitchen">
-  
+  <title>Emoji Kitchen Pro – Mix, Battle & Play</title>
+  <meta name="description" content="Mix emojis, battle, create stories, daily challenges, guess the combo and more. 100,000+ combinations.">
   <style>
     :root {
       --bg: #ffffff;
@@ -15,10 +14,9 @@
       --border: #dee2e6;
       --accent: #ff6b6b;
       --accent-hover: #ff5252;
-      --shadow: 0 20px 40px rgba(0,0,0,0.08);
+      --shadow: 0 10px 30px rgba(0,0,0,0.08);
       --emoji-bg: #e9ecef;
     }
-
     .dark {
       --bg: #1a1a2e;
       --card: #16213e;
@@ -27,452 +25,480 @@
       --border: #2a2a4a;
       --accent: #ff6b6b;
       --accent-hover: #ff5252;
-      --shadow: 0 20px 40px rgba(0,0,0,0.3);
+      --shadow: 0 10px 30px rgba(0,0,0,0.3);
       --emoji-bg: #2a2a4a;
     }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
+    * { margin:0; padding:0; box-sizing:border-box; }
     body {
-      background: var(--bg);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      background: var(--bg); color: var(--text);
       font-family: 'Segoe UI', system-ui, sans-serif;
-      padding: 20px;
-      transition: background 0.3s, color 0.3s;
-      color: var(--text);
+      min-height: 100vh; display: flex; justify-content: center; align-items: center;
+      padding: 20px; transition: background 0.3s, color 0.3s;
     }
-
     .container {
-      background: var(--card);
-      border-radius: 24px;
-      box-shadow: var(--shadow);
-      padding: 40px 30px;
-      max-width: 560px;
-      width: 100%;
-      text-align: center;
-      border: 1px solid var(--border);
-      transition: all 0.3s;
+      background: var(--card); border-radius: 24px; box-shadow: var(--shadow);
+      padding: 30px 20px; max-width: 600px; width: 100%; text-align: center;
+      border: 1px solid var(--border); transition: all 0.3s; position: relative;
     }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     h1 {
-      font-size: 2rem;
-      background: linear-gradient(135deg, #ff6b6b, #ffa751);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      font-size: 2rem; background: linear-gradient(135deg, #ff6b6b, #ffa751);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
-
     .theme-toggle {
-      background: var(--emoji-bg);
-      border: none;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 1.2rem;
-      cursor: pointer;
-      transition: transform 0.3s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: var(--emoji-bg); border: none; border-radius: 50%;
+      width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
     }
-    .theme-toggle:hover { transform: rotate(20deg); }
+    .subtitle { color: var(--subtext); margin-bottom: 15px; font-size: 0.9rem; }
 
-    .subtitle {
-      color: var(--subtext);
-      margin-bottom: 24px;
-      font-size: 0.95rem;
+    /* Tabs */
+    .tabs {
+      display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 20px;
     }
+    .tab {
+      padding: 8px 14px; border-radius: 20px; background: var(--emoji-bg); border: none;
+      color: var(--text); font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: 0.2s;
+    }
+    .tab.active { background: var(--accent); color: #fff; }
 
-    /* Emoji Grid Selector */
+    .mode-content { display: none; }
+    .mode-content.active { display: block; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+    /* Emoji Grid */
     .emoji-grid {
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-      gap: 8px;
-      max-height: 200px;
-      overflow-y: auto;
-      padding: 12px;
-      background: var(--emoji-bg);
-      border-radius: 16px;
-      margin-bottom: 20px;
-      border: 1px solid var(--border);
+      display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
+      max-height: 160px; overflow-y: auto; padding: 8px; background: var(--emoji-bg);
+      border-radius: 12px; margin: 10px 0; border: 1px solid var(--border);
     }
-
     .emoji-item {
-      font-size: 2rem;
-      cursor: pointer;
-      padding: 4px;
-      border-radius: 8px;
-      transition: all 0.2s;
-      text-align: center;
-      user-select: none;
+      font-size: 1.8rem; cursor: pointer; border-radius: 8px; text-align: center;
+      transition: all 0.2s; user-select: none; padding: 2px;
     }
-    .emoji-item:hover {
-      background: rgba(255,107,107,0.2);
-      transform: scale(1.2);
-    }
-    .emoji-item.selected {
-      background: rgba(255,107,107,0.3);
-      box-shadow: 0 0 0 3px var(--accent);
-      border-radius: 8px;
-    }
+    .emoji-item:hover { background: rgba(255,107,107,0.2); transform: scale(1.1); }
+    .emoji-item.selected { background: rgba(255,107,107,0.3); box-shadow: 0 0 0 3px var(--accent); }
 
     .selected-row {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      margin-bottom: 24px;
-      font-size: 3rem;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      font-size: 2.5rem; margin: 10px 0;
     }
-
-    .plus-sign {
-      font-size: 2rem;
-      color: var(--subtext);
-      font-weight: bold;
-    }
-
     .emoji-box {
-      background: var(--emoji-bg);
-      padding: 12px;
-      border-radius: 16px;
-      border: 2px dashed var(--border);
-      min-width: 70px;
-      min-height: 70px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: var(--emoji-bg); padding: 8px; border-radius: 16px; border: 2px dashed var(--border);
+      min-width: 60px; min-height: 60px; display: flex; align-items: center; justify-content: center;
     }
-
-    /* Result Section */
-    .result-section {
-      margin: 24px 0;
-    }
-
     .result-image {
-      max-width: 200px;
-      height: auto;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-      transition: transform 0.3s;
-      display: none;
-      margin: 0 auto;
+      max-width: 180px; border-radius: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+      display: none; margin: 10px auto;
     }
-    .result-image.show {
-      display: block;
-      animation: popIn 0.4s ease;
-    }
-
+    .result-image.show { display: block; animation: popIn 0.4s ease; }
     @keyframes popIn {
-      0% { transform: scale(0.5); opacity: 0; }
-      70% { transform: scale(1.05); }
-      100% { transform: scale(1); opacity: 1; }
+      0% { transform: scale(0.5); opacity:0; } 70% { transform: scale(1.05); } 100% { transform: scale(1); opacity:1; }
     }
-
-    .loading-spinner {
-      display: none;
-      width: 40px;
-      height: 40px;
-      border: 4px solid var(--border);
-      border-top: 4px solid var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 20px auto;
+    .spinner {
+      width: 36px; height: 36px; border: 4px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite; display: none; margin: 15px auto;
     }
-    .loading-spinner.active { display: block; }
-
+    .spinner.active { display: block; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .error-msg { color: #ff6b6b; display: none; margin-top: 8px; }
 
-    .error-msg {
-      color: #ff6b6b;
-      margin-top: 12px;
-      display: none;
-    }
-
-    /* Buttons */
-    .btn-group {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-top: 16px;
-    }
-
+    .btn-group { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
     .btn {
-      padding: 12px 24px;
-      border-radius: 50px;
-      border: none;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      padding: 10px 20px; border-radius: 50px; border: none; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 6px; font-size: 0.9rem; transition: 0.2s;
     }
-
-    .btn-primary {
-      background: var(--accent);
-      color: white;
-    }
-    .btn-primary:hover {
-      background: var(--accent-hover);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(255,107,107,0.3);
-    }
-
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-2px); }
     .btn-outline {
-      background: transparent;
-      color: var(--text);
-      border: 2px solid var(--border);
+      background: transparent; color: var(--text); border: 2px solid var(--border);
     }
-    .btn-outline:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+    .btn:disabled { opacity: 0.5; pointer-events: none; }
 
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+    .story-strip { display: flex; flex-direction: column; gap: 10px; margin: 15px 0; }
+    .story-img { max-width: 120px; border-radius: 12px; display: block; margin: 0 auto; }
 
-    /* Footer */
-    .footer {
-      margin-top: 24px;
-      font-size: 0.85rem;
-      color: var(--subtext);
+    .wall-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px;
     }
-    .footer a {
-      color: var(--accent);
-      text-decoration: none;
-    }
+    .wall-item img { width: 100%; border-radius: 12px; cursor: pointer; transition: transform 0.2s; }
+    .wall-item img:hover { transform: scale(1.05); }
 
-    /* Scrollbar */
-    .emoji-grid::-webkit-scrollbar { width: 6px; }
-    .emoji-grid::-webkit-scrollbar-track { background: transparent; }
-    .emoji-grid::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 3px;
-    }
+    .blur-img { filter: blur(20px); width: 150px; border-radius: 20px; margin: 15px auto; display: block; }
+    .guess-inputs { display: flex; gap: 10px; justify-content: center; margin: 10px 0; }
+    .guess-inputs select { font-size: 1.5rem; padding: 5px; border-radius: 10px; }
+
+    .footer { margin-top: 20px; font-size: 0.8rem; color: var(--subtext); }
+    .footer a { color: var(--accent); text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
       <h1>🍳 Emoji Kitchen Pro</h1>
-      <button class="theme-toggle" id="themeBtn" title="Toggle dark mode">🌓</button>
+      <button class="theme-toggle" id="themeBtn">🌓</button>
     </div>
-    <p class="subtitle">Pick two emojis & create unique stickers!</p>
+    <p class="subtitle">Mix, battle, create stories & play games!</p>
 
-    <!-- Emoji Grid 1 -->
-    <p style="font-weight:600; margin-bottom:4px; color:var(--subtext);">Select First Emoji</p>
-    <div class="emoji-grid" id="grid1"></div>
-
-    <div class="selected-row">
-      <div class="emoji-box" id="selected1">😊</div>
-      <span class="plus-sign">+</span>
-      <div class="emoji-box" id="selected2">😂</div>
-    </div>
-
-    <!-- Emoji Grid 2 -->
-    <p style="font-weight:600; margin-bottom:4px; color:var(--subtext);">Select Second Emoji</p>
-    <div class="emoji-grid" id="grid2"></div>
-
-    <!-- Result -->
-    <div class="result-section">
-      <div class="loading-spinner" id="spinner"></div>
-      <img class="result-image" id="resultImg" alt="Emoji Mix" crossorigin="anonymous" />
-      <p class="error-msg" id="errorMsg">⚠️ This combination isn't available. Try other emojis!</p>
+    <!-- Tabs -->
+    <div class="tabs" id="tabNav">
+      <button class="tab active" data-mode="mix">🎨 Mix</button>
+      <button class="tab" data-mode="battle">⚔️ Battle</button>
+      <button class="tab" data-mode="story">📖 Story</button>
+      <button class="tab" data-mode="challenge">🏆 Daily</button>
+      <button class="tab" data-mode="wall">🖼️ Wall</button>
+      <button class="tab" data-mode="game">❓ Guess</button>
     </div>
 
-    <!-- Action Buttons -->
-    <div class="btn-group">
-      <button class="btn btn-primary" id="downloadBtn" disabled>
-        📥 Download PNG
-      </button>
-      <button class="btn btn-outline" id="shareBtn" disabled>
-        🔗 Copy Link
-      </button>
+    <!-- ========== MIX MODE ========== -->
+    <div class="mode-content active" id="mode-mix">
+      <p style="font-weight:600; color:var(--subtext);">First Emoji</p>
+      <div class="emoji-grid" id="mixGrid1"></div>
+      <div class="selected-row">
+        <div class="emoji-box" id="mixSelected1">😊</div> <span>+</span>
+        <div class="emoji-box" id="mixSelected2">😂</div>
+      </div>
+      <p style="font-weight:600; color:var(--subtext);">Second Emoji</p>
+      <div class="emoji-grid" id="mixGrid2"></div>
+      <div class="spinner" id="mixSpinner"></div>
+      <img class="result-image" id="mixResultImg" alt="Mix" crossorigin="anonymous">
+      <p class="error-msg" id="mixError">⚠️ Combo not available</p>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="mixDownload" disabled>📥 Download</button>
+        <button class="btn btn-outline" id="mixCopy" disabled>🔗 Copy Link</button>
+      </div>
+    </div>
+
+    <!-- ========== BATTLE MODE ========== -->
+    <div class="mode-content" id="mode-battle">
+      <p>Click to generate a random epic emoji battle!</p>
+      <div class="spinner" id="battleSpinner"></div>
+      <img class="result-image" id="battleImg" alt="Battle Result" crossorigin="anonymous">
+      <p style="font-weight:bold; margin-top:8px;" id="battleCaption"></p>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="battleAgain">⚔️ New Battle</button>
+        <button class="btn btn-outline" id="battleShare">📤 Share</button>
+      </div>
+    </div>
+
+    <!-- ========== STORY MODE ========== -->
+    <div class="mode-content" id="mode-story">
+      <p>Pick 3 emoji pairs to create your comic strip!</p>
+      <div id="storySelector"></div>
+      <div class="story-strip" id="storyStrip"></div>
+      <button class="btn btn-primary" id="storyDownload" disabled>🖼️ Download Strip</button>
+      <button class="btn btn-outline" id="storyReset">🔄 Reset</button>
+    </div>
+
+    <!-- ========== DAILY CHALLENGE ========== -->
+    <div class="mode-content" id="mode-challenge">
+      <p>Today's challenge: Mix <strong id="challengeEmoji1"></strong> + <strong id="challengeEmoji2"></strong></p>
+      <div class="selected-row">
+        <span style="font-size:3rem;" id="challengeDisplay1"></span>
+        <span>+</span>
+        <span style="font-size:3rem;" id="challengeDisplay2"></span>
+      </div>
+      <button class="btn btn-primary" id="challengeMixBtn">🔀 Create My Mix</button>
+      <div class="spinner" id="challengeSpinner"></div>
+      <img class="result-image" id="challengeImg" alt="Your Mix" crossorigin="anonymous">
+      <p class="error-msg" id="challengeError">⚠️ Not available</p>
+      <button class="btn btn-outline" id="challengeShare">📤 Share Your Entry</button>
+      <p style="font-size:0.8rem; margin-top:10px;">Tag <strong>#EmojiKitchenDaily</strong> on social media!</p>
+    </div>
+
+    <!-- ========== WALL MODE ========== -->
+    <div class="mode-content" id="mode-wall">
+      <p>Random mashup gallery</p>
+      <div class="wall-grid" id="wallGrid"></div>
+      <button class="btn btn-outline" id="wallRefresh">🔄 More</button>
+    </div>
+
+    <!-- ========== GAME MODE ========== -->
+    <div class="mode-content" id="mode-game">
+      <p>Guess the two emojis that made this mashup!</p>
+      <img class="blur-img" id="gameBlurImg" alt="???" crossorigin="anonymous">
+      <div class="guess-inputs">
+        <select id="gameGuess1"></select>
+        <select id="gameGuess2"></select>
+      </div>
+      <button class="btn btn-primary" id="gameSubmit">✅ Submit Guess</button>
+      <p id="gameFeedback" style="font-weight:bold; margin-top:10px;"></p>
+      <button class="btn btn-outline" id="gameNew">🔄 New Puzzle</button>
+      <p style="font-size:0.8rem;">Score: <span id="gameScore">0</span></p>
     </div>
 
     <div class="footer">
-      Made with ❤️ | <a href="https://github.com/Emoji Kitchen/emoji-kitchen-beta" target="_blank">⭐ Star on GitHub</a>
+      Made with ❤️ | <a href="https://github.com/YOUR_USERNAME/emoji-kitchen-beta" target="_blank">⭐ Star on GitHub</a>
     </div>
   </div>
 
   <script>
     // ========== EMOJI DATASET ==========
-    // Popular emojis with their unicode code points
     const emojiList = [
-      { emoji: "😊", code: "1f60a" }, { emoji: "😂", code: "1f602" },
-      { emoji: "🥰", code: "1f970" }, { emoji: "😍", code: "1f60d" },
-      { emoji: "😘", code: "1f618" }, { emoji: "😭", code: "1f62d" },
-      { emoji: "😡", code: "1f621" }, { emoji: "😱", code: "1f631" },
-      { emoji: "🤗", code: "1f917" }, { emoji: "🤔", code: "1f914" },
-      { emoji: "😎", code: "1f60e" }, { emoji: "🥳", code: "1f973" },
-      { emoji: "😴", code: "1f634" }, { emoji: "🤩", code: "1f929" },
-      { emoji: "😇", code: "1f607" }, { emoji: "🤯", code: "1f92f" },
-      { emoji: "❤️", code: "2764" }, { emoji: "🔥", code: "1f525" },
-      { emoji: "👍", code: "1f44d" }, { emoji: "👎", code: "1f44e" },
-      { emoji: "🎉", code: "1f389" }, { emoji: "💯", code: "1f4af" },
-      { emoji: "🌈", code: "1f308" }, { emoji: "⭐", code: "2b50" },
-      { emoji: "🍕", code: "1f355" }, { emoji: "🍔", code: "1f354" },
-      { emoji: "🐶", code: "1f436" }, { emoji: "🐱", code: "1f431" },
-      { emoji: "🦊", code: "1f98a" }, { emoji: "🐼", code: "1f43c" },
-      { emoji: "🌻", code: "1f33b" }, { emoji: "🌸", code: "1f338" },
-      { emoji: "🎸", code: "1f3b8" }, { emoji: "⚽", code: "26bd" },
-      { emoji: "🚀", code: "1f680" }, { emoji: "💡", code: "1f4a1" },
-      { emoji: "🎂", code: "1f382" }, { emoji: "☕", code: "2615" },
-      { emoji: "🍦", code: "1f366" }, { emoji: "👻", code: "1f47b" }
+      { emoji:"😊", code:"1f60a" }, { emoji:"😂", code:"1f602" }, { emoji:"🥰", code:"1f970" },
+      { emoji:"😍", code:"1f60d" }, { emoji:"😘", code:"1f618" }, { emoji:"😭", code:"1f62d" },
+      { emoji:"😡", code:"1f621" }, { emoji:"😱", code:"1f631" }, { emoji:"🤗", code:"1f917" },
+      { emoji:"🤔", code:"1f914" }, { emoji:"😎", code:"1f60e" }, { emoji:"🥳", code:"1f973" },
+      { emoji:"😴", code:"1f634" }, { emoji:"🤩", code:"1f929" }, { emoji:"😇", code:"1f607" },
+      { emoji:"🤯", code:"1f92f" }, { emoji:"❤️", code:"2764" }, { emoji:"🔥", code:"1f525" },
+      { emoji:"👍", code:"1f44d" }, { emoji:"👎", code:"1f44e" }, { emoji:"🎉", code:"1f389" },
+      { emoji:"💯", code:"1f4af" }, { emoji:"🌈", code:"1f308" }, { emoji:"⭐", code:"2b50" },
+      { emoji:"🍕", code:"1f355" }, { emoji:"🍔", code:"1f354" }, { emoji:"🐶", code:"1f436" },
+      { emoji:"🐱", code:"1f431" }, { emoji:"🦊", code:"1f98a" }, { emoji:"🐼", code:"1f43c" },
+      { emoji:"🌻", code:"1f33b" }, { emoji:"🌸", code:"1f338" }, { emoji:"🎸", code:"1f3b8" },
+      { emoji:"⚽", code:"26bd" }, { emoji:"🚀", code:"1f680" }, { emoji:"💡", code:"1f4a1" },
+      { emoji:"🎂", code:"1f382" }, { emoji:"☕", code:"2615" }, { emoji:"🍦", code:"1f366" },
+      { emoji:"👻", code:"1f47b" }
     ];
 
-    // ========== STATE ==========
-    let selected1 = emojiList[0]; // default 😊
-    let selected2 = emojiList[1]; // default 😂
-
-    // ========== DOM ELEMENTS ==========
-    const grid1 = document.getElementById('grid1');
-    const grid2 = document.getElementById('grid2');
-    const selected1El = document.getElementById('selected1');
-    const selected2El = document.getElementById('selected2');
-    const resultImg = document.getElementById('resultImg');
-    const spinner = document.getElementById('spinner');
-    const errorMsg = document.getElementById('errorMsg');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const shareBtn = document.getElementById('shareBtn');
-    const themeBtn = document.getElementById('themeBtn');
-
-    // ========== RENDER EMOJI GRIDS ==========
-    function renderGrid(gridEl, selectedEmoji, gridNum) {
-      gridEl.innerHTML = '';
-      emojiList.forEach(e => {
-        const div = document.createElement('div');
-        div.className = 'emoji-item';
-        if (selectedEmoji.code === e.code) div.classList.add('selected');
-        div.textContent = e.emoji;
-        div.title = e.code;
-        div.addEventListener('click', () => {
-          if (gridNum === 1) {
-            selected1 = e;
-            selected1El.textContent = e.emoji;
-            renderGrid(grid1, selected1, 1);
-          } else {
-            selected2 = e;
-            selected2El.textContent = e.emoji;
-            renderGrid(grid2, selected2, 2);
-          }
-          fetchEmojiMix();
-        });
-        gridEl.appendChild(div);
-      });
-    }
-
-    // ========== FETCH EMOJI MIX FROM API ==========
-    async function fetchEmojiMix() {
-      const code1 = selected1.code;
-      const code2 = selected2.code;
-
-      // Reset state
-      resultImg.classList.remove('show');
-      errorMsg.style.display = 'none';
-      spinner.classList.add('active');
-      downloadBtn.disabled = true;
-      shareBtn.disabled = true;
-
-      // API URL (using emojik.vercel.app - free, no key needed)
-      const url = `https://emojik.vercel.app/s/${code1}_${code2}?size=256`;
-
+    // Helper: fetch emoji mix from API
+    async function fetchEmojiMix(code1, code2) {
+      const url1 = `https://emojik.vercel.app/s/${code1}_${code2}?size=256`;
       try {
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error('Combination not available');
-        }
-
-        const blob = await response.blob();
-        const imageUrl = URL.createObjectURL(blob);
-        
-        resultImg.src = imageUrl;
-        resultImg.onload = () => {
-          resultImg.classList.add('show');
-          spinner.classList.remove('active');
-          downloadBtn.disabled = false;
-          shareBtn.disabled = false;
-        };
-      } catch (err) {
-        // Try reverse order
-        try {
-          const url2 = `https://emojik.vercel.app/s/${code2}_${code1}?size=256`;
-          const response2 = await fetch(url2);
-          if (!response2.ok) throw new Error('Not available');
-          
-          const blob2 = await response2.blob();
-          const imageUrl2 = URL.createObjectURL(blob2);
-          
-          resultImg.src = imageUrl2;
-          resultImg.onload = () => {
-            resultImg.classList.add('show');
-            spinner.classList.remove('active');
-            downloadBtn.disabled = false;
-            shareBtn.disabled = false;
-          };
-        } catch (err2) {
-          spinner.classList.remove('active');
-          errorMsg.style.display = 'block';
-          downloadBtn.disabled = true;
-          shareBtn.disabled = true;
-        }
-      }
+        const res = await fetch(url1);
+        if (res.ok) return await res.blob();
+      } catch(e) {}
+      const url2 = `https://emojik.vercel.app/s/${code2}_${code1}?size=256`;
+      const res2 = await fetch(url2);
+      if (!res2.ok) throw new Error('Not available');
+      return await res2.blob();
     }
 
-    // ========== DOWNLOAD ==========
-    downloadBtn.addEventListener('click', () => {
-      if (!resultImg.src) return;
-      const link = document.createElement('a');
-      link.href = resultImg.src;
-      link.download = `emoji-mix-${selected1.emoji}-${selected2.emoji}.png`;
-      link.click();
-    });
-
-    // ========== COPY LINK ==========
-    shareBtn.addEventListener('click', () => {
-      const url = `https://emojik.vercel.app/s/${selected1.code}_${selected2.code}?size=256`;
-      navigator.clipboard.writeText(url).then(() => {
-        const originalText = shareBtn.innerHTML;
-        shareBtn.innerHTML = '✅ Copied!';
-        setTimeout(() => { shareBtn.innerHTML = originalText; }, 2000);
-      });
-    });
-
-    // ========== DARK MODE TOGGLE ==========
+    // ========== DARK MODE ==========
+    const themeBtn = document.getElementById('themeBtn');
     themeBtn.addEventListener('click', () => {
       document.body.classList.toggle('dark');
       const isDark = document.body.classList.contains('dark');
       themeBtn.textContent = isDark ? '☀️' : '🌓';
       localStorage.setItem('theme', isDark ? 'dark' : 'light');
     });
-
-    // Load saved theme
     if (localStorage.getItem('theme') === 'dark') {
       document.body.classList.add('dark');
       themeBtn.textContent = '☀️';
     }
 
-    // ========== INIT ==========
-    renderGrid(grid1, selected1, 1);
-    renderGrid(grid2, selected2, 2);
-    selected1El.textContent = selected1.emoji;
-    selected2El.textContent = selected2.emoji;
-    fetchEmojiMix();
+    // ========== TAB SWITCHING ==========
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const mode = tab.dataset.mode;
+        document.querySelectorAll('.mode-content').forEach(m => m.classList.remove('active'));
+        document.getElementById(`mode-${mode}`).classList.add('active');
+        if (mode === 'battle') generateBattle();
+        if (mode === 'wall') loadWall();
+        if (mode === 'challenge') initDailyChallenge();
+        if (mode === 'game') newGamePuzzle();
+        if (mode === 'story') initStoryMode();
+      });
+    });
+
+    // ========== MIX MODE ==========
+    let mixSelected1 = emojiList[0], mixSelected2 = emojiList[1];
+    const mixGrid1 = document.getElementById('mixGrid1');
+    const mixGrid2 = document.getElementById('mixGrid2');
+    function renderGrid(container, selected, callback) {
+      container.innerHTML = '';
+      emojiList.forEach(e => {
+        const div = document.createElement('div');
+        div.className = 'emoji-item';
+        if (e.code === selected.code) div.classList.add('selected');
+        div.textContent = e.emoji;
+        div.addEventListener('click', () => {
+          callback(e);
+          renderGrid(container, e, callback);
+          updateMixResult();
+        });
+        container.appendChild(div);
+      });
+    }
+    renderGrid(mixGrid1, mixSelected1, (e) => { mixSelected1 = e; document.getElementById('mixSelected1').textContent = e.emoji; });
+    renderGrid(mixGrid2, mixSelected2, (e) => { mixSelected2 = e; document.getElementById('mixSelected2').textContent = e.emoji; });
+    document.getElementById('mixSelected1').textContent = mixSelected1.emoji;
+    document.getElementById('mixSelected2').textContent = mixSelected2.emoji;
+
+    async function updateMixResult() {
+      const img = document.getElementById('mixResultImg');
+      const spinner = document.getElementById('mixSpinner');
+      const error = document.getElementById('mixError');
+      const downBtn = document.getElementById('mixDownload');
+      const copyBtn = document.getElementById('mixCopy');
+      img.classList.remove('show');
+      error.style.display = 'none';
+      spinner.classList.add('active');
+      downBtn.disabled = true; copyBtn.disabled = true;
+      try {
+        const blob = await fetchEmojiMix(mixSelected1.code, mixSelected2.code);
+        img.src = URL.createObjectURL(blob);
+        img.onload = () => { img.classList.add('show'); spinner.classList.remove('active'); downBtn.disabled = false; copyBtn.disabled = false; };
+      } catch(e) {
+        spinner.classList.remove('active'); error.style.display = 'block';
+      }
+    }
+    updateMixResult();
+
+    document.getElementById('mixDownload').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = document.getElementById('mixResultImg').src;
+      a.download = `emoji-mix-${mixSelected1.emoji}-${mixSelected2.emoji}.png`;
+      a.click();
+    });
+    document.getElementById('mixCopy').addEventListener('click', () => {
+      navigator.clipboard.writeText(window.location.href);
+      alert('Link copied!');
+    });
+
+    // ========== BATTLE MODE ==========
+    function generateBattle() {
+      const e1 = emojiList[Math.floor(Math.random() * emojiList.length)];
+      let e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
+      while(e2.code === e1.code) e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
+      document.getElementById('battleSpinner').classList.add('active');
+      document.getElementById('battleImg').classList.remove('show');
+      fetchEmojiMix(e1.code, e2.code).then(blob => {
+        document.getElementById('battleImg').src = URL.createObjectURL(blob);
+        document.getElementById('battleImg').onload = () => {
+          document.getElementById('battleImg').classList.add('show');
+          document.getElementById('battleSpinner').classList.remove('active');
+          document.getElementById('battleCaption').textContent = `${e1.emoji} vs ${e2.emoji} – who wins?`;
+        };
+      }).catch(() => generateBattle());
+    }
+    document.getElementById('battleAgain').addEventListener('click', generateBattle);
+    document.getElementById('battleShare').addEventListener('click', () => {
+      const text = encodeURIComponent('Check out this emoji battle! ' + window.location.href);
+      window.open(`https://twitter.com/intent/tweet?text=${text}`);
+    });
+
+    // ========== STORY MODE ==========
+    let storyPairs = [];
+    function initStoryMode() {
+      const selector = document.getElementById('storySelector');
+      selector.innerHTML = '<p>Pick pair then "Add to Story"</p><div id="storyPairPicker"></div>';
+      const picker = document.getElementById('storyPairPicker');
+      const sel1 = document.createElement('select'); sel1.id='storySel1';
+      const sel2 = document.createElement('select'); sel2.id='storySel2';
+      emojiList.forEach(e => { sel1.add(new Option(e.emoji, e.code)); sel2.add(new Option(e.emoji, e.code)); });
+      picker.appendChild(sel1); picker.appendChild(sel2);
+      const addBtn = document.createElement('button'); addBtn.textContent='➕ Add to Story'; addBtn.className='btn btn-outline';
+      addBtn.addEventListener('click', async () => {
+        if (storyPairs.length >= 3) return alert('Max 3 pairs!');
+        const code1 = sel1.value, code2 = sel2.value;
+        const blob = await fetchEmojiMix(code1, code2).catch(() => null);
+        if (!blob) return alert('Combo not available');
+        storyPairs.push({ code1, code2, blob });
+        renderStoryStrip();
+        document.getElementById('storyDownload').disabled = false;
+      });
+      picker.appendChild(addBtn);
+      renderStoryStrip();
+    }
+    function renderStoryStrip() {
+      const strip = document.getElementById('storyStrip');
+      strip.innerHTML = storyPairs.map(p => `<img src="${URL.createObjectURL(p.blob)}" class="story-img">`).join('');
+    }
+    document.getElementById('storyDownload').addEventListener('click', () => {
+      // combine images into canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = 400; canvas.height = storyPairs.length * 200;
+      const ctx = canvas.getContext('2d');
+      let y = 0;
+      storyPairs.forEach(p => {
+        const img = new Image(); img.src = URL.createObjectURL(p.blob);
+        img.onload = () => { ctx.drawImage(img, 100, y, 200, 200); y += 200; if (y >= storyPairs.length*200) downloadCanvas(); };
+      });
+      function downloadCanvas() {
+        const a = document.createElement('a');
+        a.download = 'emoji-story.png';
+        a.href = canvas.toDataURL();
+        a.click();
+      }
+    });
+    document.getElementById('storyReset').addEventListener('click', () => {
+      storyPairs = []; renderStoryStrip(); document.getElementById('storyDownload').disabled = true;
+    });
+
+    // ========== DAILY CHALLENGE ==========
+    function initDailyChallenge() {
+      const today = new Date().toDateString();
+      const seed = today.split('').reduce((a,b)=>a+b.charCodeAt(0),0);
+      const idx1 = seed % emojiList.length;
+      const idx2 = (seed * 7) % emojiList.length;
+      const e1 = emojiList[idx1], e2 = emojiList[idx2];
+      document.getElementById('challengeEmoji1').textContent = e1.emoji;
+      document.getElementById('challengeEmoji2').textContent = e2.emoji;
+      document.getElementById('challengeDisplay1').textContent = e1.emoji;
+      document.getElementById('challengeDisplay2').textContent = e2.emoji;
+      document.getElementById('challengeMixBtn').onclick = async () => {
+        const spinner = document.getElementById('challengeSpinner');
+        const img = document.getElementById('challengeImg');
+        spinner.classList.add('active'); img.classList.remove('show');
+        try {
+          const blob = await fetchEmojiMix(e1.code, e2.code);
+          img.src = URL.createObjectURL(blob);
+          img.onload = () => { img.classList.add('show'); spinner.classList.remove('active'); };
+        } catch(e) {
+          spinner.classList.remove('active'); document.getElementById('challengeError').style.display='block';
+        }
+      };
+      document.getElementById('challengeShare').onclick = () => {
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent('My #EmojiKitchenDaily entry!')}`);
+      };
+    }
+
+    // ========== WALL MODE ==========
+    function loadWall() {
+      const wall = document.getElementById('wallGrid');
+      wall.innerHTML = '';
+      for(let i=0; i<8; i++) {
+        const e1 = emojiList[Math.floor(Math.random()*emojiList.length)];
+        const e2 = emojiList[Math.floor(Math.random()*emojiList.length)];
+        const div = document.createElement('div'); div.className='wall-item';
+        const img = document.createElement('img');
+        fetchEmojiMix(e1.code, e2.code).then(blob => { img.src = URL.createObjectURL(blob); }).catch(()=>{});
+        div.appendChild(img);
+        wall.appendChild(div);
+      }
+    }
+    document.getElementById('wallRefresh').addEventListener('click', loadWall);
+
+    // ========== GAME MODE ==========
+    let gameAnswer = { code1:'', code2:'', blob:null };
+    let gameScore = 0;
+    async function newGamePuzzle() {
+      const e1 = emojiList[Math.floor(Math.random()*emojiList.length)];
+      const e2 = emojiList[Math.floor(Math.random()*emojiList.length)];
+      gameAnswer = { code1:e1.code, code2:e2.code, blob:null };
+      try {
+        gameAnswer.blob = await fetchEmojiMix(e1.code, e2.code);
+        const img = document.getElementById('gameBlurImg');
+        img.src = URL.createObjectURL(gameAnswer.blob);
+        document.getElementById('gameFeedback').textContent = '';
+        document.getElementById('gameGuess1').innerHTML = '';
+        document.getElementById('gameGuess2').innerHTML = '';
+        emojiList.forEach(e => {
+          document.getElementById('gameGuess1').add(new Option(e.emoji, e.code));
+          document.getElementById('gameGuess2').add(new Option(e.emoji, e.code));
+        });
+      } catch(e) { newGamePuzzle(); }
+    }
+    document.getElementById('gameSubmit').addEventListener('click', () => {
+      const g1 = document.getElementById('gameGuess1').value;
+      const g2 = document.getElementById('gameGuess2').value;
+      if ((g1===gameAnswer.code1 && g2===gameAnswer.code2) || (g1===gameAnswer.code2 && g2===gameAnswer.code1)) {
+        gameScore += 10;
+        document.getElementById('gameFeedback').textContent = '✅ Correct! +10';
+      } else {
+        document.getElementById('gameFeedback').textContent = '❌ Wrong! Try again.';
+      }
+      document.getElementById('gameScore').textContent = gameScore;
+    });
+    document.getElementById('gameNew').addEventListener('click', newGamePuzzle);
+    newGamePuzzle();
+
+    // initial wall load if active
+    if (document.getElementById('mode-wall').classList.contains('active')) loadWall();
   </script>
 </body>
-</html>                                                                                                          
+</html>                                                                                           
