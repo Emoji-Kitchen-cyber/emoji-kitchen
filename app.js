@@ -115,7 +115,6 @@ function select2(e) {
   renderMix();
 }
 
-// Expose filterGrid for HTML inline calls (if any remain)
 window.filterGrid = (id, query) => {
   if (id === 'mixGrid1') renderGrid('mixGrid1', mixSel1, select1, query);
   else if (id === 'mixGrid2') renderGrid('mixGrid2', mixSel2, select2, query);
@@ -302,7 +301,231 @@ async function newGamePuzzle() {
   } catch(e) { newGamePuzzle(); }
 }
 
-// ---------- AI MODE ----------
+// ========== SMART AI MOOD DETECTION SYSTEM ==========
+
+const MOOD_CATEGORIES = [
+  {
+    name: "happy",
+    emojis: ["😊", "😄", "😃", "🥳", "🎉", "⭐", "🌈", "🤩", "😇", "💯"],
+    keywords: [
+      { word: "happy", weight: 10 },
+      { word: "joy", weight: 10 },
+      { word: "glad", weight: 9 },
+      { word: "cheerful", weight: 9 },
+      { word: "delighted", weight: 9 },
+      { word: "excited", weight: 8 },
+      { word: "great", weight: 7 },
+      { word: "awesome", weight: 7 },
+      { word: "wonderful", weight: 7 },
+      { word: "fantastic", weight: 7 },
+      { word: "smile", weight: 8 },
+      { word: "laugh", weight: 8 },
+      { word: "fun", weight: 6 },
+      { word: "positive", weight: 5 },
+      { word: "good", weight: 4 },
+      { word: "nice", weight: 3 },
+      { word: "blessed", weight: 6 },
+      { word: "grateful", weight: 5 },
+    ]
+  },
+  {
+    name: "sad",
+    emojis: ["😭", "😢", "😞", "😔", "😩", "😿", "💔", "🥺"],
+    keywords: [
+      { word: "sad", weight: 10 },
+      { word: "cry", weight: 10 },
+      { word: "crying", weight: 10 },
+      { word: "unhappy", weight: 9 },
+      { word: "depressed", weight: 9 },
+      { word: "upset", weight: 8 },
+      { word: "sorrow", weight: 9 },
+      { word: "grief", weight: 9 },
+      { word: "lonely", weight: 8 },
+      { word: "heartbreak", weight: 9 },
+      { word: "pain", weight: 6 },
+      { word: "hurt", weight: 6 },
+      { word: "miss", weight: 5 },
+    ]
+  },
+  {
+    name: "angry",
+    emojis: ["😡", "🤬", "😤", "💢", "👿", "😠", "💥"],
+    keywords: [
+      { word: "angry", weight: 10 },
+      { word: "mad", weight: 10 },
+      { word: "rage", weight: 10 },
+      { word: "furious", weight: 10 },
+      { word: "annoyed", weight: 8 },
+      { word: "frustrated", weight: 8 },
+      { word: "hate", weight: 9 },
+      { word: "irritated", weight: 8 },
+      { word: "fuming", weight: 9 },
+    ]
+  },
+  {
+    name: "funny",
+    emojis: ["😂", "🤣", "😆", "😜", "🤪", "😹", "💀", "🤡"],
+    keywords: [
+      { word: "funny", weight: 10 },
+      { word: "lol", weight: 10 },
+      { word: "haha", weight: 10 },
+      { word: "joke", weight: 9 },
+      { word: "hilarious", weight: 10 },
+      { word: "silly", weight: 8 },
+      { word: "goofy", weight: 8 },
+      { word: "crazy", weight: 6 },
+      { word: "wild", weight: 5 },
+      { word: "meme", weight: 8 },
+      { word: "rofl", weight: 10 },
+    ]
+  },
+  {
+    name: "party",
+    emojis: ["🎉", "🥳", "🎂", "🎈", "🎊", "🍾", "💃", "🕺", "🎶"],
+    keywords: [
+      { word: "party", weight: 10 },
+      { word: "celebrate", weight: 10 },
+      { word: "birthday", weight: 10 },
+      { word: "dance", weight: 9 },
+      { word: "festival", weight: 9 },
+      { word: "fun", weight: 7 },
+      { word: "weekend", weight: 7 },
+      { word: "event", weight: 6 },
+      { word: "cheers", weight: 8 },
+    ]
+  },
+  {
+    name: "scary",
+    emojis: ["😱", "👻", "💀", "🎃", "😨", "😰", "🕷️", "🕸️"],
+    keywords: [
+      { word: "scary", weight: 10 },
+      { word: "fear", weight: 10 },
+      { word: "horror", weight: 10 },
+      { word: "spooky", weight: 10 },
+      { word: "creepy", weight: 10 },
+      { word: "terrified", weight: 10 },
+      { word: "ghost", weight: 10 },
+      { word: "haunted", weight: 9 },
+      { word: "nightmare", weight: 9 },
+    ]
+  },
+  {
+    name: "food",
+    emojis: ["🍕", "🍔", "🍦", "🍩", "🌮", "🍿", "☕", "🍪", "🎂"],
+    keywords: [
+      { word: "food", weight: 10 },
+      { word: "hungry", weight: 10 },
+      { word: "pizza", weight: 10 },
+      { word: "burger", weight: 10 },
+      { word: "eat", weight: 9 },
+      { word: "tasty", weight: 9 },
+      { word: "delicious", weight: 9 },
+      { word: "yummy", weight: 9 },
+      { word: "meal", weight: 8 },
+      { word: "snack", weight: 8 },
+      { word: "ice cream", weight: 10 },
+      { word: "coffee", weight: 9 },
+      { word: "cake", weight: 9 },
+    ]
+  },
+  {
+    name: "animals",
+    emojis: ["🐶", "🐱", "🐼", "🦊", "🐨", "🐸", "🦁", "🐯", "🐰"],
+    keywords: [
+      { word: "animal", weight: 10 },
+      { word: "dog", weight: 10 },
+      { word: "cat", weight: 10 },
+      { word: "pet", weight: 9 },
+      { word: "puppy", weight: 10 },
+      { word: "kitten", weight: 10 },
+      { word: "cute animal", weight: 9 },
+      { word: "wild", weight: 7 },
+      { word: "zoo", weight: 8 },
+      { word: "panda", weight: 10 },
+      { word: "fox", weight: 10 },
+    ]
+  }
+];
+
+function detectMood(prompt) {
+  const promptLower = prompt.toLowerCase();
+  let bestCategory = null;
+  let bestScore = 0;
+
+  MOOD_CATEGORIES.forEach(category => {
+    let categoryScore = 0;
+    category.keywords.forEach(kw => {
+      if (promptLower.includes(kw.word)) {
+        categoryScore += kw.weight;
+      }
+    });
+    if (categoryScore > bestScore) {
+      bestScore = categoryScore;
+      bestCategory = category;
+    }
+  });
+
+  // If no strong match found, default to "happy"
+  if (!bestCategory || bestScore < 3) {
+    bestCategory = MOOD_CATEGORIES.find(c => c.name === "happy");
+  }
+
+  return bestCategory;
+}
+
+function getRandomEmojiFromCategory(category) {
+  const emojiChar = category.emojis[Math.floor(Math.random() * category.emojis.length)];
+  const found = emojiList.find(e => e.emoji === emojiChar);
+  return found || emojiList[0];
+}
+
+function getSecondEmoji(firstEmoji, prompt) {
+  const promptLower = prompt.toLowerCase();
+
+  // If prompt mentions two moods/things, try to find second category
+  const allMatches = [];
+  MOOD_CATEGORIES.forEach(category => {
+    let score = 0;
+    category.keywords.forEach(kw => {
+      if (promptLower.includes(kw.word)) {
+        score += kw.weight;
+      }
+    });
+    if (score >= 3) {
+      allMatches.push({ category, score });
+    }
+  });
+
+  // Sort by score descending
+  allMatches.sort((a, b) => b.score - a.score);
+
+  // If we have at least 2 different categories, pick from second one
+  if (allMatches.length >= 2) {
+    const secondCategory = allMatches[1].category;
+    if (secondCategory.name !== allMatches[0].category.name) {
+      const emojiChar = secondCategory.emojis[Math.floor(Math.random() * secondCategory.emojis.length)];
+      const found = emojiList.find(e => e.emoji === emojiChar);
+      if (found && found.code !== firstEmoji.code) {
+        return found;
+      }
+    }
+  }
+
+  // Otherwise pick a random emoji from the same category (but different)
+  const firstCategory = allMatches[0]?.category || MOOD_CATEGORIES[0];
+  const otherEmojis = firstCategory.emojis.filter(e => e !== firstEmoji.emoji);
+  if (otherEmojis.length > 0) {
+    const emojiChar = otherEmojis[Math.floor(Math.random() * otherEmojis.length)];
+    const found = emojiList.find(e => e.emoji === emojiChar);
+    if (found) return found;
+  }
+
+  // Fallback: random from entire list
+  const others = emojiList.filter(e => e.code !== firstEmoji.code);
+  return others[Math.floor(Math.random() * others.length)];
+}
+
+// ---------- AI MODE (REAL OPENAI + SMART FALLBACK) ----------
 async function aiGenerate() {
   const prompt = getEl('aiPrompt')?.value.trim();
   if (!prompt) return alert("Please describe a feeling or mood!");
@@ -312,6 +535,7 @@ async function aiGenerate() {
   if (img) img.classList.remove('show');
 
   try {
+    // Try OpenAI first
     const response = await fetch("/api/ai-generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -331,37 +555,16 @@ async function aiGenerate() {
     }
   } catch (e) {
     console.log("OpenAI failed, using smart fallback...", e.message);
-    await aiFallback(prompt, sp, img);
+    await aiSmartFallback(prompt, sp, img);
   }
 }
 
-async function aiFallback(prompt, sp, img) {
+async function aiSmartFallback(prompt, sp, img) {
   try {
-    const moodMap = [
-      { keys: ["happy", "joy", "fun", "excited", "great", "awesome"], emoji: "😊" },
-      { keys: ["sad", "cry", "crying", "unhappy", "depressed", "upset"], emoji: "😭" },
-      { keys: ["love", "heart", "romance", "romantic", "valentine", "kiss"], emoji: "❤️" },
-      { keys: ["fire", "hot", "flame", "lit", "burning", "blazing"], emoji: "🔥" },
-      { keys: ["party", "celebrate", "birthday", "dance", "festival", "fun"], emoji: "🎉" },
-      { keys: ["cool", "ice", "chill", "cold", "frozen", "winter"], emoji: "😎" },
-      { keys: ["crazy", "wild", "insane", "mad", "goofy", "silly"], emoji: "🤪" },
-      { keys: ["sleep", "tired", "sleepy", "lazy", "boring", "dull"], emoji: "😴" },
-      { keys: ["angry", "mad", "rage", "furious", "annoyed", "frustrated"], emoji: "😡" },
-      { keys: ["scared", "fear", "horror", "spooky", "creepy", "terrified"], emoji: "😱" },
-      { keys: ["food", "hungry", "pizza", "burger", "eat", "tasty"], emoji: "🍕" },
-      { keys: ["animal", "dog", "cat", "pet", "cute animal", "puppy"], emoji: "🐶" }
-    ];
-
-    const promptLower = prompt.toLowerCase();
-    let e1 = emojiList[0];
-    moodMap.forEach(m => {
-      if (m.keys.some(k => promptLower.includes(k))) {
-        const found = emojiList.find(e => e.emoji === m.emoji);
-        if (found) e1 = found;
-      }
-    });
-
-    const e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
+    const category = detectMood(prompt);
+    const e1 = getRandomEmojiFromCategory(category);
+    const e2 = getSecondEmoji(e1, prompt);
+    
     const objUrl = await fetchEmojiMix(e1.code, e2.code);
     if (img) {
       img.src = objUrl;
@@ -371,10 +574,10 @@ async function aiFallback(prompt, sp, img) {
         playSound();
       };
     }
-  } catch (fallbackError) {
+  } catch (error) {
     if (sp) sp.classList.remove('active');
     alert("AI mix failed, try a different description!");
-    console.error("AI Error:", fallbackError);
+    console.error("AI Fallback Error:", error);
   }
 }
 
