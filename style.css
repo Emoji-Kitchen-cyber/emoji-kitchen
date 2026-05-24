@@ -242,7 +242,7 @@ body {
 /* Error Message */
 .error-msg {
   color: #ff5e7a;
-  display: none;
+  display: none; /* Crucial: Hide by default */
   text-align: center;
   margin-top: 8px;
   font-weight: 600;
