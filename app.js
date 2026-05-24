@@ -32,8 +32,8 @@ let currentVoteCombo = null, votes = 0;
 let storyPairs = [];
 let gameAnswer = {}, gameScore = 0;
 
-// ---------- DOM ELEMENTS ----------
-const $ = (id) => document.getElementById(id);
+// ---------- DOM ELEMENTS (Safe Getters) ----------
+const getEl = (id) => document.getElementById(id);
 
 // ---------- UTILITY FUNCTIONS ----------
 async function fetchEmojiMix(code1, code2) {
@@ -50,12 +50,16 @@ async function fetchEmojiMix(code1, code2) {
 }
 
 function playSound() {
-  const sound = $('mixSound');
+  const sound = getEl('mixSound');
   if (sound) sound.play().catch(() => {});
 }
 
 function getFavorites() {
-  return JSON.parse(localStorage.getItem('emojifavs') || '[]');
+  try {
+    return JSON.parse(localStorage.getItem('emojifavs') || '[]');
+  } catch (e) {
+    return [];
+  }
 }
 
 function saveFavorite(code1, code2) {
@@ -73,9 +77,15 @@ function removeFavorite(code1, code2) {
   renderFavorites();
 }
 
+function toggleDarkMode() {
+  document.body.classList.toggle('neon-dark');
+  const btn = getEl('themeToggleFloat');
+  if (btn) btn.textContent = document.body.classList.contains('neon-dark') ? '☀️' : '🌓';
+}
+
 // ---------- GRID RENDERING ----------
 function renderGrid(containerId, selected, onClick, searchQuery = '') {
-  const container = $(containerId);
+  const container = getEl(containerId);
   if (!container) return;
   container.innerHTML = '';
   const filtered = emojiList.filter(e => e.emoji.includes(searchQuery) || e.code.includes(searchQuery));
@@ -91,19 +101,21 @@ function renderGrid(containerId, selected, onClick, searchQuery = '') {
 
 function select1(e) {
   mixSel1 = e;
-  if ($('mixSelected1')) $('mixSelected1').textContent = e.emoji;
+  const el = getEl('mixSelected1');
+  if (el) el.textContent = e.emoji;
   renderGrid('mixGrid1', mixSel1, select1);
   renderMix();
 }
 
 function select2(e) {
   mixSel2 = e;
-  if ($('mixSelected2')) $('mixSelected2').textContent = e.emoji;
+  const el = getEl('mixSelected2');
+  if (el) el.textContent = e.emoji;
   renderGrid('mixGrid2', mixSel2, select2);
   renderMix();
 }
 
-// ---------- FILTER GRID (exposed to global scope for HTML onclick) ----------
+// Expose filterGrid for HTML inline calls (if any remain)
 window.filterGrid = (id, query) => {
   if (id === 'mixGrid1') renderGrid('mixGrid1', mixSel1, select1, query);
   else if (id === 'mixGrid2') renderGrid('mixGrid2', mixSel2, select2, query);
@@ -111,11 +123,12 @@ window.filterGrid = (id, query) => {
 
 // ---------- MIX MODE ----------
 async function renderMix() {
-  const img = $('mixResultImg'), spinner = $('mixSpinner');
-  const error = $('mixError'), down = $('mixDownload');
-  const downCard = $('mixDownloadCard'), copy = $('mixCopy');
-  const whatsapp = $('mixWhatsapp'), save = $('mixSave');
-  
+  const img = getEl('mixResultImg'), spinner = getEl('mixSpinner');
+  const error = getEl('mixError');
+  const down = getEl('mixDownload'), downCard = getEl('mixDownloadCard');
+  const copy = getEl('mixCopy'), whatsapp = getEl('mixWhatsapp');
+  const save = getEl('mixSave');
+
   if (!img) return;
   
   img.classList.remove('show');
@@ -148,8 +161,9 @@ async function renderMix() {
 function randomMix() {
   mixSel1 = emojiList[Math.floor(Math.random() * emojiList.length)];
   mixSel2 = emojiList[Math.floor(Math.random() * emojiList.length)];
-  if ($('mixSelected1')) $('mixSelected1').textContent = mixSel1.emoji;
-  if ($('mixSelected2')) $('mixSelected2').textContent = mixSel2.emoji;
+  const el1 = getEl('mixSelected1'), el2 = getEl('mixSelected2');
+  if (el1) el1.textContent = mixSel1.emoji;
+  if (el2) el2.textContent = mixSel2.emoji;
   renderGrid('mixGrid1', mixSel1, select1);
   renderGrid('mixGrid2', mixSel2, select2);
   renderMix();
@@ -161,7 +175,8 @@ function generateBattle() {
   let e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
   while (e2.code === e1.code) e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
   
-  const spinner = $('battleSpinner'), img = $('battleImg');
+  const spinner = getEl('battleSpinner'), img = getEl('battleImg');
+  const caption = getEl('battleCaption');
   if (spinner) spinner.classList.add('active');
   if (img) img.classList.remove('show');
   
@@ -171,7 +186,7 @@ function generateBattle() {
       img.onload = () => {
         img.classList.add('show');
         if (spinner) spinner.classList.remove('active');
-        if ($('battleCaption')) $('battleCaption').textContent = `${e1.emoji} vs ${e2.emoji} – who wins?`;
+        if (caption) caption.textContent = `${e1.emoji} vs ${e2.emoji} – who wins?`;
         playSound();
       };
     }
@@ -180,7 +195,7 @@ function generateBattle() {
 
 // ---------- STORY MODE ----------
 function initStoryMode() {
-  const selector = $('storySelector');
+  const selector = getEl('storySelector');
   if (!selector) return;
   selector.innerHTML = `
     <select id="storySel1">${emojiList.map(e => `<option value="${e.code}">${e.emoji}</option>`).join('')}</select>
@@ -188,14 +203,18 @@ function initStoryMode() {
     <button class="btn" id="storyAdd">➕ Add</button>
   `;
   
-  $('storyAdd').onclick = async () => {
+  const addBtn = getEl('storyAdd');
+  if (addBtn) addBtn.onclick = async () => {
     if (storyPairs.length >= 3) return alert('Max 3 panels');
-    const c1 = $('storySel1').value, c2 = $('storySel2').value;
+    const sel1 = getEl('storySel1'), sel2 = getEl('storySel2');
+    const c1 = sel1?.value, c2 = sel2?.value;
+    if (!c1 || !c2) return;
     try {
       const objUrl = await fetchEmojiMix(c1, c2);
       storyPairs.push({ code1: c1, code2: c2, objUrl });
       renderStoryStrip();
-      if ($('storyDownload')) $('storyDownload').disabled = false;
+      const downBtn = getEl('storyDownload');
+      if (downBtn) downBtn.disabled = false;
       playSound();
     } catch(e) { alert('Combo not available'); }
   };
@@ -203,7 +222,7 @@ function initStoryMode() {
 }
 
 function renderStoryStrip() {
-  const strip = $('storyStrip');
+  const strip = getEl('storyStrip');
   if (strip) strip.innerHTML = storyPairs.map(p => `<img src="${p.objUrl}" style="max-width:120px;border-radius:12px;">`).join('');
 }
 
@@ -214,16 +233,16 @@ function initDailyChallenge() {
   const e1 = emojiList[seed % emojiList.length];
   const e2 = emojiList[(seed * 7) % emojiList.length];
   
-  const setText = (id, text) => { const el = $(id); if (el) el.textContent = text; };
+  const setText = (id, text) => { const el = getEl(id); if (el) el.textContent = text; };
   setText('challengeEmoji1', e1.emoji);
   setText('challengeEmoji2', e2.emoji);
   setText('challengeDisplay1', e1.emoji);
   setText('challengeDisplay2', e2.emoji);
   
-  const mixBtn = $('challengeMixBtn');
+  const mixBtn = getEl('challengeMixBtn');
   if (mixBtn) {
     mixBtn.onclick = async () => {
-      const sp = $('challengeSpinner'), img = $('challengeImg');
+      const sp = getEl('challengeSpinner'), img = getEl('challengeImg');
       if (sp) sp.classList.add('active');
       if (img) img.classList.remove('show');
       try {
@@ -238,19 +257,19 @@ function initDailyChallenge() {
         }
       } catch(e) {
         if (sp) sp.classList.remove('active');
-        const err = $('challengeError');
+        const err = getEl('challengeError');
         if (err) err.style.display = 'block';
       }
     };
   }
   
-  const shareBtn = $('challengeShare');
+  const shareBtn = getEl('challengeShare');
   if (shareBtn) shareBtn.onclick = () => window.open('https://twitter.com/intent/tweet?text=My%20%23EmojiKitchenDaily%20entry!');
 }
 
 // ---------- WALL MODE ----------
 function loadWall() {
-  const wall = $('wallGrid');
+  const wall = getEl('wallGrid');
   if (!wall) return;
   wall.innerHTML = '';
   for (let i = 0; i < 8; i++) {
@@ -272,23 +291,23 @@ async function newGamePuzzle() {
   gameAnswer = { code1: e1.code, code2: e2.code };
   try {
     const objUrl = await fetchEmojiMix(e1.code, e2.code);
-    const blurImg = $('gameBlurImg');
+    const blurImg = getEl('gameBlurImg');
     if (blurImg) blurImg.src = objUrl;
-    const s1 = $('gameGuess1'), s2 = $('gameGuess2');
+    const s1 = getEl('gameGuess1'), s2 = getEl('gameGuess2');
     const options = emojiList.map(e => `<option value="${e.code}">${e.emoji}</option>`).join('');
     if (s1) s1.innerHTML = options;
     if (s2) s2.innerHTML = options;
-    const fb = $('gameFeedback');
+    const fb = getEl('gameFeedback');
     if (fb) fb.textContent = '';
   } catch(e) { newGamePuzzle(); }
 }
 
 // ---------- AI MODE ----------
 async function aiGenerate() {
-  const prompt = $('aiPrompt')?.value.trim();
+  const prompt = getEl('aiPrompt')?.value.trim();
   if (!prompt) return alert("Please describe a feeling or mood!");
 
-  const sp = $('aiSpinner'), img = $('aiImg');
+  const sp = getEl('aiSpinner'), img = getEl('aiImg');
   if (sp) sp.classList.add('active');
   if (img) img.classList.remove('show');
 
@@ -361,7 +380,7 @@ async function aiFallback(prompt, sp, img) {
 
 // ---------- TRENDING ----------
 function loadTrending() {
-  const container = $('trendingList');
+  const container = getEl('trendingList');
   if (!container) return;
   container.innerHTML = '';
   trendingCombos.forEach(async c => {
@@ -381,7 +400,7 @@ function loadTrending() {
 
 // ---------- FAVORITES ----------
 function renderFavorites() {
-  const container = $('favoritesList');
+  const container = getEl('favoritesList');
   if (!container) return;
   container.innerHTML = '';
   getFavorites().forEach(async f => {
@@ -407,14 +426,11 @@ async function shareComboCard(imgUrl, e1, e2) {
   const ctx = canvas.getContext("2d");
   canvas.width = 500;
   canvas.height = 500;
-
   ctx.fillStyle = "#111";
   ctx.fillRect(0, 0, 500, 500);
-
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = imgUrl;
-
   img.onload = () => {
     ctx.drawImage(img, 100, 120, 300, 300);
     ctx.fillStyle = "#fff";
@@ -423,7 +439,6 @@ async function shareComboCard(imgUrl, e1, e2) {
     ctx.fillText("Emoji Kitchen Pro", 250, 40);
     ctx.font = "30px Inter, Arial";
     ctx.fillText(e1 + " + " + e2, 250, 460);
-
     const link = document.createElement("a");
     link.download = "emoji-card.png";
     link.href = canvas.toDataURL();
@@ -445,20 +460,14 @@ function shareSite() {
 }
 
 function scrollToTool() {
-  const tool = $('tool');
+  const tool = getEl('tool');
   if (tool) tool.scrollIntoView({ behavior: 'smooth' });
-}
-
-function toggleDarkMode() {
-  document.body.classList.toggle('neon-dark');
-  const btn = $('themeToggleFloat');
-  if (btn) btn.textContent = document.body.classList.contains('neon-dark') ? '☀️' : '🌓';
 }
 
 function voteCombo(up) {
   if (currentVoteCombo) {
     votes += up ? 1 : -1;
-    const vc = $('voteCount');
+    const vc = getEl('voteCount');
     if (vc) vc.textContent = votes;
   }
 }
@@ -471,7 +480,7 @@ function setupTabs() {
       tab.classList.add('active');
       const mode = tab.dataset.mode;
       document.querySelectorAll('.mode-content').forEach(m => m.classList.remove('active'));
-      const modeEl = $(`mode-${mode}`);
+      const modeEl = getEl(`mode-${mode}`);
       if (modeEl) modeEl.classList.add('active');
 
       switch(mode) {
@@ -489,24 +498,22 @@ function setupTabs() {
 
 // ---------- EVENT LISTENERS ----------
 function setupEventListeners() {
-  // Scroll to tool
-  const scrollBtn = $('scrollToToolBtn');
+  const scrollBtn = getEl('scrollToToolBtn');
   if (scrollBtn) scrollBtn.addEventListener('click', scrollToTool);
 
-  // Dark mode toggle
-  const darkBtn = $('toggleDarkModeBtn');
+  const darkBtn = getEl('toggleDarkModeBtn');
   if (darkBtn) darkBtn.addEventListener('click', toggleDarkMode);
-  if ($('themeToggleFloat')) $('themeToggleFloat').addEventListener('click', toggleDarkMode);
+  
+  const themeFloat = getEl('themeToggleFloat');
+  if (themeFloat) themeFloat.addEventListener('click', toggleDarkMode);
 
-  // Random mix
-  const randomBtn = $('randomMixBtn');
+  const randomBtn = getEl('randomMixBtn');
   if (randomBtn) randomBtn.addEventListener('click', randomMix);
 
-  // Mix download
-  const mixDownload = $('mixDownload');
+  const mixDownload = getEl('mixDownload');
   if (mixDownload) mixDownload.addEventListener('click', () => {
-    const img = $('mixResultImg');
-    if (img && img.src) {
+    const img = getEl('mixResultImg');
+    if (img?.src) {
       const a = document.createElement('a');
       a.href = img.src;
       a.download = `emojimix-${mixSel1.emoji}-${mixSel2.emoji}.png`;
@@ -514,64 +521,54 @@ function setupEventListeners() {
     }
   });
 
-  // Mix card download
-  const mixCard = $('mixDownloadCard');
+  const mixCard = getEl('mixDownloadCard');
   if (mixCard) mixCard.addEventListener('click', () => {
-    const img = $('mixResultImg');
-    if (img && img.src) shareComboCard(img.src, mixSel1.emoji, mixSel2.emoji);
+    const img = getEl('mixResultImg');
+    if (img?.src) shareComboCard(img.src, mixSel1.emoji, mixSel2.emoji);
   });
 
-  // Mix copy link
-  const mixCopy = $('mixCopy');
+  const mixCopy = getEl('mixCopy');
   if (mixCopy) mixCopy.addEventListener('click', () => navigator.clipboard.writeText(window.location.href));
 
-  // Mix WhatsApp
-  const mixWA = $('mixWhatsapp');
+  const mixWA = getEl('mixWhatsapp');
   if (mixWA) mixWA.addEventListener('click', () => {
     window.open(`https://wa.me/?text=Check%20this%20emoji%20mix!%20${encodeURIComponent(window.location.href)}`);
   });
 
-  // Mix save
-  const mixSave = $('mixSave');
+  const mixSave = getEl('mixSave');
   if (mixSave) mixSave.addEventListener('click', () => saveFavorite(mixSel1.code, mixSel2.code));
 
-  // Voting
-  const voteUp = $('voteUpBtn');
-  const voteDown = $('voteDownBtn');
+  const voteUp = getEl('voteUpBtn'), voteDown = getEl('voteDownBtn');
   if (voteUp) voteUp.addEventListener('click', () => voteCombo(true));
   if (voteDown) voteDown.addEventListener('click', () => voteCombo(false));
 
-  // Battle
-  const battleAgain = $('battleAgain');
+  const battleAgain = getEl('battleAgain');
   if (battleAgain) battleAgain.addEventListener('click', generateBattle);
-  const battleShare = $('battleShare');
+  
+  const battleShare = getEl('battleShare');
   if (battleShare) battleShare.addEventListener('click', () => {
     window.open(`https://twitter.com/intent/tweet?text=Emoji%20battle!%20${encodeURIComponent(window.location.href)}`);
   });
 
-  // Story
-  const storyReset = $('storyReset');
+  const storyReset = getEl('storyReset');
   if (storyReset) storyReset.addEventListener('click', () => {
     storyPairs = [];
     renderStoryStrip();
-    const sd = $('storyDownload');
+    const sd = getEl('storyDownload');
     if (sd) sd.disabled = true;
   });
-  const storyDownload = $('storyDownload');
-  if (storyDownload) storyDownload.addEventListener('click', () => {
-    alert('Story download feature – export as image soon!');
-  });
+  
+  const storyDownload = getEl('storyDownload');
+  if (storyDownload) storyDownload.addEventListener('click', () => alert('Story download coming soon'));
 
-  // Wall refresh
-  const wallRefresh = $('wallRefresh');
+  const wallRefresh = getEl('wallRefresh');
   if (wallRefresh) wallRefresh.addEventListener('click', loadWall);
 
-  // Game
-  const gameSubmit = $('gameSubmit');
+  const gameSubmit = getEl('gameSubmit');
   if (gameSubmit) gameSubmit.addEventListener('click', () => {
-    const g1 = $('gameGuess1')?.value, g2 = $('gameGuess2')?.value;
-    const fb = $('gameFeedback'), gs = $('gameScore');
-    if (g1 && g2 && (g1===gameAnswer.code1 && g2===gameAnswer.code2) || (g1===gameAnswer.code2 && g2===gameAnswer.code1)) {
+    const g1 = getEl('gameGuess1')?.value, g2 = getEl('gameGuess2')?.value;
+    const fb = getEl('gameFeedback'), gs = getEl('gameScore');
+    if (g1 && g2 && ((g1===gameAnswer.code1 && g2===gameAnswer.code2) || (g1===gameAnswer.code2 && g2===gameAnswer.code1))) {
       gameScore += 10;
       if (fb) fb.textContent = '✅ Correct! +10';
     } else {
@@ -580,28 +577,24 @@ function setupEventListeners() {
     if (gs) gs.textContent = gameScore;
     playSound();
   });
-  const gameNew = $('gameNew');
+  
+  const gameNew = getEl('gameNew');
   if (gameNew) gameNew.addEventListener('click', newGamePuzzle);
 
-  // AI generate
-  const aiBtn = $('aiGenerate');
+  const aiBtn = getEl('aiGenerate');
   if (aiBtn) aiBtn.addEventListener('click', aiGenerate);
 
-  // Search inputs
-  const search1 = $('mixSearch1');
-  const search2 = $('mixSearch2');
+  const search1 = getEl('mixSearch1'), search2 = getEl('mixSearch2');
   if (search1) search1.addEventListener('input', (e) => window.filterGrid('mixGrid1', e.target.value));
   if (search2) search2.addEventListener('input', (e) => window.filterGrid('mixGrid2', e.target.value));
 
-  // Clear favorites
-  const clearFav = $('clearFavorites');
+  const clearFav = getEl('clearFavorites');
   if (clearFav) clearFav.addEventListener('click', () => {
     localStorage.removeItem('emojifavs');
     renderFavorites();
   });
 
-  // Share tool
-  const shareTool = $('shareToolBtn');
+  const shareTool = getEl('shareToolBtn');
   if (shareTool) shareTool.addEventListener('click', shareSite);
 }
 
@@ -620,20 +613,19 @@ function setupPWA() {
 function init() {
   renderGrid('mixGrid1', mixSel1, select1);
   renderGrid('mixGrid2', mixSel2, select2);
-  if ($('mixSelected1')) $('mixSelected1').textContent = mixSel1.emoji;
-  if ($('mixSelected2')) $('mixSelected2').textContent = mixSel2.emoji;
+  const el1 = getEl('mixSelected1'), el2 = getEl('mixSelected2');
+  if (el1) el1.textContent = mixSel1.emoji;
+  if (el2) el2.textContent = mixSel2.emoji;
   renderMix();
 
   setupTabs();
   setupEventListeners();
   setupPWA();
 
-  // Initial mode loads
   loadWall();
   initDailyChallenge();
   loadTrending();
   renderFavorites();
 }
 
-// Start the app
 document.addEventListener('DOMContentLoaded', init);
