@@ -2,11 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <meta name="theme-color" content="#ff5e7a">
-
   <title>Emoji Kitchen Pro – AI Emoji Mix & Mashup Playground</title>
   <meta name="description" content="Mix, battle, create stories & play with 100,000+ emoji combinations. Daily challenges, trending combos, AI suggestions, wallpaper generator & more.">
   <meta name="keywords" content="emoji kitchen, emoji mix, emoji mashup, emoji combiner, emoji art, sticker maker, ai emoji">
@@ -14,6 +11,7 @@
   <meta property="og:description" content="Create insane emoji mashups! Battle mode, daily challenge, funny categories & more.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
+  <link rel="manifest" href="/manifest.json">
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -280,7 +278,7 @@
       <!-- AI Mix Mode -->
       <div class="mode-content" id="mode-ai">
         <p>Describe any feeling or object, AI will pick emojis & mix!</p>
-        <input class="search-input" id="aiPrompt" placeholder="e.g. 'happy crying laughing'">
+        <input class="search-input" id="aiPrompt" placeholder="e.g. happy crying laughing">
         <button class="btn btn-primary" id="aiGenerate">🤖 Generate Mix</button>
         <div class="spinner" id="aiSpinner"></div>
         <img class="result-image" id="aiImg" alt="AI Mix" crossorigin="anonymous">
@@ -709,6 +707,15 @@
     }
 
     window.scrollToTool = () => document.getElementById('tool').scrollIntoView({ behavior: 'smooth' });
+
+    // ========== PWA SERVICE WORKER ==========
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js")
+          .then(() => console.log("PWA Ready"))
+          .catch(err => console.log(err));
+      });
+    }
 
     loadWall();
     initDailyChallenge();
