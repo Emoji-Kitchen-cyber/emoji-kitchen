@@ -1,4 +1,4 @@
-      <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -58,7 +58,6 @@
       max-width: 680px; margin: 0 auto; padding: 20px;
     }
 
-    /* Hero */
     .hero {
       text-align: center; margin: 30px 0 20px;
     }
@@ -87,7 +86,6 @@
     .btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
     .btn:disabled { opacity: 0.5; pointer-events: none; }
 
-    /* Tool Card */
     .card {
       background: var(--card); border-radius: var(--radius);
       box-shadow: var(--shadow); padding: 24px 18px; margin: 20px 0;
@@ -100,7 +98,6 @@
       position: fixed; bottom: 25px; right: 25px; z-index: 100; box-shadow: var(--shadow);
     }
 
-    /* Tabs */
     .tabs {
       display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 20px;
     }
@@ -114,7 +111,6 @@
     .mode-content.active { display: block; animation: fadeIn 0.3s; }
     @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
-    /* Emoji Grid & Search */
     .search-wrap { position: relative; margin-bottom: 10px; }
     .search-input {
       width: 100%; padding: 12px 16px; border-radius: 30px; border: 1px solid var(--border);
@@ -179,7 +175,6 @@
 </head>
 <body class="neon-dark">
   <div class="container-main">
-    <!-- Hero -->
     <div class="hero">
       <h1>🍳 Emoji Kitchen Pro</h1>
       <p>Mix, battle, create & laugh with 100,000+ AI-powered emoji mashups</p>
@@ -189,7 +184,6 @@
       </div>
     </div>
 
-    <!-- Main Tool Card -->
     <div class="card" id="tool">
       <div class="tabs" id="tabNav">
         <button class="tab active" data-mode="mix">🎨 Mix</button>
@@ -218,6 +212,7 @@
         <p class="error-msg" style="color:#ff5e7a;display:none;" id="mixError">⚠️ Combo not available</p>
         <div class="btn-group" style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
           <button class="btn" id="mixDownload" disabled>📥 Download</button>
+          <button class="btn" id="mixDownloadCard" disabled>🖼️ Card</button>
           <button class="btn" id="mixCopy" disabled>🔗 Copy Link</button>
           <button class="btn" id="mixWhatsapp" disabled>💬 WhatsApp</button>
           <button class="btn" id="mixSave" disabled>❤️ Save</button>
@@ -300,14 +295,11 @@
         <button class="btn" id="clearFavorites">🗑 Clear All</button>
       </div>
 
-      <!-- Sound -->
       <audio id="mixSound" preload="auto" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" style="display:none;"></audio>
     </div>
 
-    <!-- Ad placeholder -->
     <div class="ads-placeholder">📢 Ad Space – Your Ad Here (AdSense Coming Soon)</div>
 
-    <!-- YOUR NEW FOOTER -->
     <div class="footer" style="text-align:center; padding:20px; color:var(--subtext);">
       💡 <b>Emoji Kitchen Pro</b> – Fun emoji mixer tool
       <br><br>
@@ -332,7 +324,6 @@
   <button class="theme-toggle" onclick="document.body.classList.toggle('neon-dark')">🌓</button>
 
   <script>
-    // ========== FULL DATASET & FEATURES ==========
     const emojiList = [
       { emoji:"😊", code:"1f60a" },{ emoji:"😂", code:"1f602" },{ emoji:"🥰", code:"1f970" },
       { emoji:"😍", code:"1f60d" },{ emoji:"😘", code:"1f618" },{ emoji:"😭", code:"1f62d" },
@@ -350,7 +341,6 @@
       { emoji:"👻", code:"1f47b" }
     ];
 
-    // Trending combos (static)
     const trendingCombos = [
       { code1:"1f602", code2:"2764" },
       { code1:"1f60d", code2:"1f525" },
@@ -358,12 +348,10 @@
       { code1:"1f389", code2:"1f382" },
     ];
 
-    // ========== EMOJI CACHE ==========
     const emojiCache = {};
 
     async function fetchEmojiMix(code1, code2) {
       const key = code1 + "_" + code2;
-
       if (emojiCache[key]) return emojiCache[key];
 
       const url = `https://emojik.vercel.app/s/${code1}_${code2}?size=256`;
@@ -377,7 +365,6 @@
 
     function playSound() { document.getElementById('mixSound').play().catch(()=>{}); }
 
-    // ========== STORAGE ==========
     function getFavorites() { return JSON.parse(localStorage.getItem('emojifavs') || '[]'); }
     function saveFavorite(code1, code2) {
       const favs = getFavorites();
@@ -393,11 +380,9 @@
       renderFavorites();
     }
 
-    // ========== VOTING (local) ==========
     let currentVoteCombo = null, votes = 0;
     function voteCombo(up) { if (currentVoteCombo) { votes += up ? 1 : -1; document.getElementById('voteCount').textContent = votes; } }
 
-    // ========== GRID & SELECTION ==========
     let mixSel1 = emojiList[0], mixSel2 = emojiList[1];
     function renderGrid(containerId, selected, onClick, searchQuery = '') {
       const container = document.getElementById(containerId);
@@ -426,23 +411,23 @@
     async function renderMix() {
       const img = document.getElementById('mixResultImg'), spinner = document.getElementById('mixSpinner');
       const error = document.getElementById('mixError'), down = document.getElementById('mixDownload');
+      const downCard = document.getElementById('mixDownloadCard');
       const copy = document.getElementById('mixCopy'), whatsapp = document.getElementById('mixWhatsapp');
       const save = document.getElementById('mixSave');
       img.classList.remove('show'); error.style.display='none'; spinner.classList.add('active');
-      down.disabled = true; copy.disabled = true; whatsapp.disabled = true; save.disabled = true;
+      down.disabled = true; downCard.disabled = true; copy.disabled = true; whatsapp.disabled = true; save.disabled = true;
       try {
         const objUrl = await fetchEmojiMix(mixSel1.code, mixSel2.code);
         img.src = objUrl;
         img.onload = () => {
           img.classList.add('show'); spinner.classList.remove('active');
-          down.disabled = false; copy.disabled = false; whatsapp.disabled = false; save.disabled = false;
+          down.disabled = false; downCard.disabled = false; copy.disabled = false; whatsapp.disabled = false; save.disabled = false;
           currentVoteCombo = { code1: mixSel1.code, code2: mixSel2.code };
           playSound();
         };
-        // In case the image is already loaded (cached)
         if (img.complete) {
           img.classList.add('show'); spinner.classList.remove('active');
-          down.disabled = false; copy.disabled = false; whatsapp.disabled = false; save.disabled = false;
+          down.disabled = false; downCard.disabled = false; copy.disabled = false; whatsapp.disabled = false; save.disabled = false;
         }
       } catch(e) {
         spinner.classList.remove('active'); error.style.display='block';
@@ -452,6 +437,9 @@
     document.getElementById('mixDownload').onclick = () => {
       const a = document.createElement('a'); a.href = document.getElementById('mixResultImg').src;
       a.download = `emojimix-${mixSel1.emoji}-${mixSel2.emoji}.png`; a.click();
+    };
+    document.getElementById('mixDownloadCard').onclick = () => {
+      shareComboCard(document.getElementById('mixResultImg').src, mixSel1.emoji, mixSel2.emoji);
     };
     document.getElementById('mixCopy').onclick = () => navigator.clipboard.writeText(window.location.href);
     document.getElementById('mixWhatsapp').onclick = () => {
@@ -468,7 +456,6 @@
       renderMix();
     };
 
-    // ========== BATTLE ==========
     function generateBattle() {
       const e1 = emojiList[Math.floor(Math.random()*emojiList.length)];
       let e2 = emojiList[Math.floor(Math.random()*emojiList.length)];
@@ -490,7 +477,6 @@
       window.open(`https://twitter.com/intent/tweet?text=Emoji%20battle!%20${encodeURIComponent(window.location.href)}`);
     });
 
-    // ========== STORY ==========
     let storyPairs = [];
     function initStoryMode() {
       document.getElementById('storySelector').innerHTML = `
@@ -518,7 +504,6 @@
     document.getElementById('storyDownload').onclick = () => { alert('Story download feature – export as image soon!'); };
     document.getElementById('storyReset').onclick = () => { storyPairs=[]; renderStoryStrip(); document.getElementById('storyDownload').disabled=true; };
 
-    // ========== DAILY CHALLENGE ==========
     function initDailyChallenge() {
       const today = new Date().toDateString();
       const seed = today.split('').reduce((a,b)=>a+b.charCodeAt(0),0);
@@ -540,7 +525,6 @@
       document.getElementById('challengeShare').onclick = () => window.open('https://twitter.com/intent/tweet?text=My%20%23EmojiKitchenDaily%20entry!');
     }
 
-    // ========== WALL ==========
     function loadWall() {
       const wall = document.getElementById('wallGrid');
       wall.innerHTML = '';
@@ -555,7 +539,6 @@
     }
     document.getElementById('wallRefresh').addEventListener('click', loadWall);
 
-    // ========== GAME ==========
     let gameAnswer = {}, gameScore = 0;
     async function newGamePuzzle() {
       const e1 = emojiList[Math.floor(Math.random()*emojiList.length)];
@@ -579,27 +562,48 @@
     };
     document.getElementById('gameNew').onclick = newGamePuzzle;
 
-    // ========== AI MODE ==========
+    // ========== AI MODE (UPGRADED SMART VERSION) ==========
     document.getElementById('aiGenerate').onclick = async () => {
       const prompt = document.getElementById('aiPrompt').value.toLowerCase();
-      const map = {
-        'happy':'😊', 'sad':'😢', 'love':'❤️', 'fire':'🔥', 'party':'🎉', 'cool':'😎', 'crazy':'🤪', 'sleep':'😴'
-      };
-      let found = [emojiList[0], emojiList[1]];
-      for (let [word, emoji] of Object.entries(map)) {
-        if (prompt.includes(word)) found[0] = emojiList.find(e=>e.emoji===emoji) || found[0];
-      }
-      found[1] = emojiList[Math.floor(Math.random()*emojiList.length)];
-      const sp = document.getElementById('aiSpinner'), img = document.getElementById('aiImg');
-      sp.classList.add('active'); img.classList.remove('show');
+      const sp = document.getElementById('aiSpinner');
+      const img = document.getElementById('aiImg');
+      sp.classList.add('active');
+      img.classList.remove('show');
+
       try {
-        const objUrl = await fetchEmojiMix(found[0].code, found[1].code);
+        const moodMap = [
+          { keys: ["happy", "joy", "fun"], emoji: "😊" },
+          { keys: ["sad", "cry"], emoji: "😭" },
+          { keys: ["love", "heart"], emoji: "❤️" },
+          { keys: ["fire", "hot"], emoji: "🔥" },
+          { keys: ["party", "celebrate"], emoji: "🎉" },
+          { keys: ["cool", "ice"], emoji: "😎" },
+          { keys: ["crazy", "wild"], emoji: "🤪" },
+          { keys: ["sleep", "tired"], emoji: "😴" }
+        ];
+
+        let e1 = emojiList[0];
+        moodMap.forEach(m => {
+          if (m.keys.some(k => prompt.includes(k))) {
+            const found = emojiList.find(e => e.emoji === m.emoji);
+            if (found) e1 = found;
+          }
+        });
+
+        const e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
+        const objUrl = await fetchEmojiMix(e1.code, e2.code);
         img.src = objUrl;
-        img.onload = () => { img.classList.add('show'); sp.classList.remove('active'); playSound(); };
-      } catch(e) { sp.classList.remove('active'); alert('AI could not mix'); }
+        img.onload = () => {
+          img.classList.add('show');
+          sp.classList.remove('active');
+          playSound();
+        };
+      } catch (e) {
+        sp.classList.remove('active');
+        alert("AI mix failed, try again");
+      }
     };
 
-    // ========== TRENDING ==========
     function loadTrending() {
       const container = document.getElementById('trendingList');
       container.innerHTML = '';
@@ -615,7 +619,6 @@
       });
     }
 
-    // ========== FAVORITES ==========
     function renderFavorites() {
       const container = document.getElementById('favoritesList');
       container.innerHTML = '';
@@ -633,7 +636,6 @@
     }
     document.getElementById('clearFavorites').onclick = () => { localStorage.removeItem('emojifavs'); renderFavorites(); };
 
-    // ========== TAB SWITCHING ==========
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -651,10 +653,45 @@
       });
     });
 
-    // ========== SHARE SITE (updated, from user) ==========
+    // ===== SHARE COMBO CARD =====
+    async function shareComboCard(imgUrl, e1, e2) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = 500;
+      canvas.height = 500;
+
+      // background
+      ctx.fillStyle = "#111";
+      ctx.fillRect(0, 0, 500, 500);
+
+      // load emoji image
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = imgUrl;
+
+      img.onload = () => {
+        ctx.drawImage(img, 100, 120, 300, 300);
+
+        // watermark
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 20px Inter, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Emoji Kitchen Pro", 250, 40);
+
+        // emoji labels
+        ctx.font = "30px Inter, Arial";
+        ctx.fillText(e1 + " + " + e2, 250, 460);
+
+        const link = document.createElement("a");
+        link.download = "emoji-card.png";
+        link.href = canvas.toDataURL();
+        link.click();
+      };
+    }
+
     function shareSite() {
       const url = window.location.href;
-
       if (navigator.share) {
         navigator.share({
           title: "Emoji Kitchen Pro",
@@ -667,14 +704,12 @@
       }
     }
 
-    // ========== SCROLL TO TOOL ==========
     window.scrollToTool = () => document.getElementById('tool').scrollIntoView({ behavior: 'smooth' });
 
-    // initial load
     loadWall();
     initDailyChallenge();
     loadTrending();
     renderFavorites();
   </script>
 </body>
-</html>                
+</html>
