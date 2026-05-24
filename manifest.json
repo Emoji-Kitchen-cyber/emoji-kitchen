@@ -1,0 +1,20 @@
+{
+  "name": "Emoji Kitchen Pro",
+  "short_name": "EmojiKitchen",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f1a",
+  "theme_color": "#ff5e7a",
+  "icons": [
+    {
+      "src": "https://emojik.vercel.app/s/1f60a_1f602?size=192",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://emojik.vercel.app/s/1f60a_1f602?size=512",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
