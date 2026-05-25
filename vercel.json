@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/emoji-mix/(.*)",
-      "destination": "/"
+      "source": "/emoji-mix/:slug*",
+      "destination": "/index.html"
     }
   ]
 }
