@@ -1,7 +1,31 @@
-// ==================== EMOJI KITCHEN PRO - MAIN APP ====================
+// ==================== EMOJI KITCHEN PRO - PRODUCTION APP (STABILITY PATCH) ====================
+
+// ---------- CONFIGURATION ----------
+const CONFIG = {
+  EMOJI_API_BASE: 'https://emojik.vercel.app/s',
+  EMOJI_SIZE: 256,
+  MAX_STORY_PANELS: 3,
+  WALL_ITEMS: 8,
+  VOTE_INCREMENT: 1,
+  GAME_SCORE_INCREMENT: 10,
+  AI_MODEL: 'gpt-4o-mini',
+  AI_MAX_TOKENS: 50,
+  AI_TEMPERATURE: 0.9,
+  FALLBACK_MIN_SCORE: 3,
+  CACHE_PREFIX: 'emoji_kitchen_',
+  STORAGE_KEYS: {
+    FAVORITES: 'emojifavs',
+    THEME: 'theme',
+    VOTES: 'votes'
+  },
+  AI_TIMEOUT_MS: 15000,
+  CACHE_MAX_AGE_MS: 600000, // 10 minutes
+  CACHE_MAX_SIZE: 250,
+  RENDER_DEBOUNCE_MS: 50
+};
 
 // ---------- DATA ----------
-const emojiList = [
+const emojiList = Object.freeze([
   { emoji:"😊", code:"1f60a" },{ emoji:"😂", code:"1f602" },{ emoji:"🥰", code:"1f970" },
   { emoji:"😍", code:"1f60d" },{ emoji:"😘", code:"1f618" },{ emoji:"😭", code:"1f62d" },
   { emoji:"😡", code:"1f621" },{ emoji:"😱", code:"1f631" },{ emoji:"🤗", code:"1f917" },
@@ -16,223 +40,598 @@ const emojiList = [
   { emoji:"⚽", code:"26bd" },{ emoji:"🚀", code:"1f680" },{ emoji:"💡", code:"1f4a1" },
   { emoji:"🎂", code:"1f382" },{ emoji:"☕", code:"2615" },{ emoji:"🍦", code:"1f366" },
   { emoji:"👻", code:"1f47b" }
-];
+]);
 
-const trendingCombos = [
+const trendingCombos = Object.freeze([
   { code1:"1f602", code2:"2764" },
   { code1:"1f60d", code2:"1f525" },
   { code1:"1f970", code2:"1f618" },
   { code1:"1f389", code2:"1f382" },
-];
+]);
+
+// ---------- PRODUCTION LOGGER ----------
+const logger = {
+  info: (msg, data) => {
+    if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) return;
+    console.info(`[EmojiKitchen] ${msg}`, data || '');
+  },
+  warn: (msg, data) => console.warn(`[EmojiKitchen] ${msg}`, data || ''),
+  error: (msg, error) => console.error(`[EmojiKitchen] ${msg}`, error?.message || error)
+};
 
 // ---------- GLOBAL STATE ----------
-const emojiCache = {};
-let mixSel1 = emojiList[0], mixSel2 = emojiList[1];
-let currentVoteCombo = null, votes = 0;
-let storyPairs = [];
-let gameAnswer = {}, gameScore = 0;
+const state = {
+  mixSel1: emojiList[0],
+  mixSel2: emojiList[1],
+  currentVoteCombo: null,
+  votes: parseInt(localStorage.getItem(CONFIG.STORAGE_KEYS.VOTES) || '0', 10),
+  storyPairs: [],
+  gameAnswer: {},
+  gameScore: 0,
+  isRendering: false,
+  aiRequestInFlight: false,
+  renderToken: 0
+};
 
-// ---------- DOM ELEMENTS (Safe Getters) ----------
-const getEl = (id) => document.getElementById(id);
+// ---------- MEMORY & PERFORMANCE MANAGEMENT ----------
+const emojiCache = new Map();
+const pendingFetches = new Map();
+const moodCache = new Map();
+const objectURLs = new Set();
+const globalCleanupTasks = [];
 
-// ---------- UTILITY FUNCTIONS ----------
-async function fetchEmojiMix(code1, code2) {
-  const key = code1 + "_" + code2;
-  if (emojiCache[key]) return emojiCache[key];
-
-  const url = `https://emojik.vercel.app/s/${code1}_${code2}?size=256`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Not available');
-  const blob = await res.blob();
-  const objUrl = URL.createObjectURL(blob);
-  emojiCache[key] = objUrl;
-  return objUrl;
+function createSafeObjectURL(blob) {
+  const url = URL.createObjectURL(blob);
+  objectURLs.add(url);
+  return url;
 }
 
+function revokeObjectURLSafe(url) {
+  if (url && objectURLs.has(url)) {
+    URL.revokeObjectURL(url);
+    objectURLs.delete(url);
+  }
+}
+
+function cleanupAllObjectURLs() {
+  objectURLs.forEach(url => {
+    try { URL.revokeObjectURL(url); } catch (e) {}
+  });
+  objectURLs.clear();
+}
+
+// Timestamp-based cache eviction
+function evictStaleCache() {
+  const now = Date.now();
+  const toDelete = [];
+  for (const [key, entry] of emojiCache.entries()) {
+    if (now - entry.timestamp > CONFIG.CACHE_MAX_AGE_MS) {
+      toDelete.push(key);
+    }
+  }
+  // If still over limit, remove oldest first
+  if (emojiCache.size - toDelete.length > CONFIG.CACHE_MAX_SIZE) {
+    const sorted = [...emojiCache.entries()]
+      .filter(([key]) => !toDelete.includes(key))
+      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const extraDelete = sorted.slice(0, sorted.length - CONFIG.CACHE_MAX_SIZE);
+    extraDelete.forEach(([key]) => toDelete.push(key));
+  }
+  toDelete.forEach(key => {
+    const entry = emojiCache.get(key);
+    if (entry?.url) revokeObjectURLSafe(entry.url);
+    emojiCache.delete(key);
+  });
+}
+
+const cacheCleanupInterval = setInterval(evictStaleCache, 300000);
+globalCleanupTasks.push(() => clearInterval(cacheCleanupInterval));
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    evictStaleCache();
+    moodCache.clear();
+  }
+});
+
+// ---------- DOM UTILITIES ----------
+const domCache = new Map();
+
+const getEl = (id) => {
+  if (!domCache.has(id)) {
+    const el = document.getElementById(id);
+    if (el) domCache.set(id, el);
+    return el;
+  }
+  const cached = domCache.get(id);
+  if (cached && cached.isConnected) return cached;
+  const el = document.getElementById(id);
+  if (el) domCache.set(id, el);
+  return el;
+};
+
+const setButtonStates = (buttons, disabled) => {
+  buttons.forEach(id => {
+    const btn = getEl(id);
+    if (btn) btn.disabled = disabled;
+  });
+};
+
+const setText = (id, text) => {
+  const el = getEl(id);
+  if (el) el.textContent = text;
+};
+
+const setDisplay = (id, display) => {
+  const el = getEl(id);
+  if (el) el.style.display = display;
+};
+
+// ---------- SAFE STORAGE ----------
+const storage = {
+  get(key, fallback = null) {
+    try {
+      const value = localStorage.getItem(`${CONFIG.CACHE_PREFIX}${key}`);
+      return value ? JSON.parse(value) : fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(`${CONFIG.CACHE_PREFIX}${key}`, JSON.stringify(value));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  remove(key) {
+    try {
+      localStorage.removeItem(`${CONFIG.CACHE_PREFIX}${key}`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+};
+
+// ---------- API UTILITIES ----------
+async function fetchEmojiMix(code1, code2) {
+  const cacheKey = `${code1}_${code2}`;
+  
+  // Check cache first
+  if (emojiCache.has(cacheKey)) {
+    const entry = emojiCache.get(cacheKey);
+    entry.timestamp = Date.now(); // Refresh access time
+    return entry.url;
+  }
+
+  // Return pending promise if already in flight
+  if (pendingFetches.has(cacheKey)) {
+    return pendingFetches.get(cacheKey);
+  }
+
+  const url = `${CONFIG.EMOJI_API_BASE}/${code1}_${code2}?size=${CONFIG.EMOJI_SIZE}`;
+  
+  const fetchPromise = (async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: Not available`);
+      }
+      
+      const blob = await res.blob();
+      const objUrl = createSafeObjectURL(blob);
+      
+      emojiCache.set(cacheKey, {
+        url: objUrl,
+        timestamp: Date.now()
+      });
+      
+      return objUrl;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out. Please try again.');
+      }
+      throw error;
+    } finally {
+      pendingFetches.delete(cacheKey);
+    }
+  })();
+
+  pendingFetches.set(cacheKey, fetchPromise);
+  return fetchPromise;
+}
+
+async function fetchWithRetry(fn, maxRetries = 2) {
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+}
+
+// ---------- AUDIO ----------
 function playSound() {
   const sound = getEl('mixSound');
-  if (sound) sound.play().catch(() => {});
+  if (sound) {
+    sound.currentTime = 0;
+    sound.play().catch(() => {});
+  }
 }
 
+// ---------- FAVORITES MANAGEMENT ----------
 function getFavorites() {
-  try {
-    return JSON.parse(localStorage.getItem('emojifavs') || '[]');
-  } catch (e) {
-    return [];
-  }
+  return storage.get(CONFIG.STORAGE_KEYS.FAVORITES, []);
 }
 
 function saveFavorite(code1, code2) {
   const favs = getFavorites();
-  if (!favs.find(f => (f.code1===code1 && f.code2===code2) || (f.code1===code2 && f.code2===code1))) {
+  const exists = favs.some(f => 
+    (f.code1 === code1 && f.code2 === code2) || 
+    (f.code1 === code2 && f.code2 === code1)
+  );
+  
+  if (!exists) {
     favs.push({ code1, code2, date: Date.now() });
-    localStorage.setItem('emojifavs', JSON.stringify(favs));
+    storage.set(CONFIG.STORAGE_KEYS.FAVORITES, favs);
     renderFavorites();
   }
 }
 
 function removeFavorite(code1, code2) {
-  let favs = getFavorites().filter(f => !((f.code1===code1 && f.code2===code2) || (f.code1===code2 && f.code2===code1)));
-  localStorage.setItem('emojifavs', JSON.stringify(favs));
+  const favs = getFavorites().filter(f => 
+    !((f.code1 === code1 && f.code2 === code2) || 
+      (f.code1 === code2 && f.code2 === code1))
+  );
+  storage.set(CONFIG.STORAGE_KEYS.FAVORITES, favs);
   renderFavorites();
 }
 
+// ---------- THEME ----------
 function toggleDarkMode() {
-  document.body.classList.toggle('neon-dark');
+  const isDark = document.body.classList.toggle('neon-dark');
   const btn = getEl('themeToggleFloat');
-  if (btn) btn.textContent = document.body.classList.contains('neon-dark') ? '☀️' : '🌓';
+  if (btn) {
+    btn.textContent = isDark ? '☀️' : '🌓';
+    btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+  }
+  storage.set(CONFIG.STORAGE_KEYS.THEME, isDark ? 'dark' : 'light');
 }
 
-// ---------- GRID RENDERING ----------
+function loadTheme() {
+  const saved = storage.get(CONFIG.STORAGE_KEYS.THEME, 'dark');
+  if (saved === 'light') {
+    document.body.classList.remove('neon-dark');
+    const btn = getEl('themeToggleFloat');
+    if (btn) {
+      btn.textContent = '🌓';
+      btn.setAttribute('aria-label', 'Switch to dark mode');
+    }
+  }
+}
+
+// ---------- GRID RENDERING (Optimized with partial updates) ----------
 function renderGrid(containerId, selected, onClick, searchQuery = '') {
   const container = getEl(containerId);
   if (!container) return;
-  container.innerHTML = '';
-  const filtered = emojiList.filter(e => e.emoji.includes(searchQuery) || e.code.includes(searchQuery));
+
+  const query = searchQuery.toLowerCase();
+  const filtered = query 
+    ? emojiList.filter(e => e.emoji.includes(query) || e.code.includes(query))
+    : emojiList;
+
+  // Build new HTML string for faster rendering
+  let html = '';
   filtered.forEach(e => {
-    const div = document.createElement('div');
-    div.className = 'emoji-item';
-    if (selected && e.code === selected.code) div.classList.add('selected');
-    div.textContent = e.emoji;
-    div.addEventListener('click', () => onClick(e));
-    container.appendChild(div);
+    const selectedClass = (selected && e.code === selected.code) ? ' selected' : '';
+    const ariaSelected = (selected && e.code === selected.code) ? ' aria-selected="true"' : '';
+    html += `<div class="emoji-item${selectedClass}" role="button" tabindex="0" aria-label="Select ${e.emoji} emoji"${ariaSelected} data-code="${e.code}">${e.emoji}</div>`;
   });
+
+  container.innerHTML = html;
+
+  // Attach event listeners using event delegation
+  if (!container._hasDelegation) {
+    container.addEventListener('click', (e) => {
+      const item = e.target.closest('.emoji-item');
+      if (!item) return;
+      const code = item.dataset.code;
+      const emojiObj = emojiList.find(e => e.code === code);
+      if (emojiObj) onClick(emojiObj);
+    });
+    container.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        const item = e.target.closest('.emoji-item');
+        if (!item) return;
+        e.preventDefault();
+        const code = item.dataset.code;
+        const emojiObj = emojiList.find(e => e.code === code);
+        if (emojiObj) onClick(emojiObj);
+      }
+    });
+    container._hasDelegation = true;
+  }
 }
 
 function select1(e) {
-  mixSel1 = e;
-  const el = getEl('mixSelected1');
-  if (el) el.textContent = e.emoji;
-  renderGrid('mixGrid1', mixSel1, select1);
+  state.mixSel1 = e;
+  setText('mixSelected1', e.emoji);
+  renderGrid('mixGrid1', state.mixSel1, select1);
   renderMix();
 }
 
 function select2(e) {
-  mixSel2 = e;
-  const el = getEl('mixSelected2');
-  if (el) el.textContent = e.emoji;
-  renderGrid('mixGrid2', mixSel2, select2);
+  state.mixSel2 = e;
+  setText('mixSelected2', e.emoji);
+  renderGrid('mixGrid2', state.mixSel2, select2);
   renderMix();
 }
 
 window.filterGrid = (id, query) => {
-  if (id === 'mixGrid1') renderGrid('mixGrid1', mixSel1, select1, query);
-  else if (id === 'mixGrid2') renderGrid('mixGrid2', mixSel2, select2, query);
+  if (id === 'mixGrid1') renderGrid('mixGrid1', state.mixSel1, select1, query);
+  else if (id === 'mixGrid2') renderGrid('mixGrid2', state.mixSel2, select2, query);
 };
 
-// ---------- MIX MODE ----------
-async function renderMix() {
-  const img = getEl('mixResultImg'), spinner = getEl('mixSpinner');
-  const error = getEl('mixError');
-  const down = getEl('mixDownload'), downCard = getEl('mixDownloadCard');
-  const copy = getEl('mixCopy'), whatsapp = getEl('mixWhatsapp');
-  const save = getEl('mixSave');
+// ========== SEO SYSTEM ==========
 
+const EMOJI_NAME_MAP = {
+  "1f525":"fire","2764":"heart","1f602":"laugh","1f60d":"love","1f970":"smile",
+  "1f618":"kiss","1f436":"dog","1f431":"cat","1f389":"party","1f382":"cake",
+  "1f47b":"ghost","1f680":"rocket","1f60a":"smile","1f62d":"cry","1f621":"angry",
+  "1f631":"scared","1f917":"hug","1f914":"think","1f60e":"cool","1f973":"party",
+  "1f634":"sleep","1f929":"star","1f607":"angel","1f92f":"explode","1f44d":"like",
+  "1f44e":"dislike","1f4af":"100","1f308":"rainbow","2b50":"star","1f355":"pizza",
+  "1f354":"burger","1f98a":"fox","1f43c":"panda","1f33b":"flower","1f338":"cherry",
+  "1f3b8":"guitar","26bd":"soccer","1f4a1":"idea","2615":"coffee","1f366":"icecream"
+};
+
+const SEO_CACHE = {};
+
+function getEmojiName(code) {
+  if (!SEO_CACHE[code]) {
+    SEO_CACHE[code] = EMOJI_NAME_MAP[code] || code;
+  }
+  return SEO_CACHE[code];
+}
+
+let lastSEOUpdate = '';
+
+function updateSEOUrl() {
+  const slug1 = getEmojiName(state.mixSel1.code);
+  const slug2 = getEmojiName(state.mixSel2.code);
+  const newUrl = `/emoji-mix/${slug1}-${slug2}`;
+  
+  const cacheKey = `${slug1}_${slug2}`;
+  if (lastSEOUpdate === cacheKey) return;
+  lastSEOUpdate = cacheKey;
+
+  history.replaceState(
+    { emoji1: state.mixSel1.code, emoji2: state.mixSel2.code },
+    '',
+    newUrl
+  );
+
+  requestAnimationFrame(() => {
+    document.title = `${slug1} + ${slug2} Emoji Mix | Emoji Kitchen Pro`;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', `Mix ${slug1} and ${slug2} emojis online with Emoji Kitchen Pro. Create unique emoji mashups, download PNG stickers, and share with friends.`);
+    }
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute('content', `${slug1} + ${slug2} Emoji Mix | Emoji Kitchen Pro`);
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute('content', `Mix ${slug1} and ${slug2} emojis online. Create unique emoji mashups with Emoji Kitchen Pro.`);
+  });
+}
+
+// ---------- POPSTATE HANDLER ----------
+let popstateDebounce = null;
+window.addEventListener('popstate', (event) => {
+  if (popstateDebounce) clearTimeout(popstateDebounce);
+  popstateDebounce = setTimeout(() => {
+    if (event.state?.emoji1 && event.state?.emoji2) {
+      const found1 = emojiList.find(e => e.code === event.state.emoji1);
+      const found2 = emojiList.find(e => e.code === event.state.emoji2);
+      if (found1) state.mixSel1 = found1;
+      if (found2) state.mixSel2 = found2;
+      setText('mixSelected1', state.mixSel1.emoji);
+      setText('mixSelected2', state.mixSel2.emoji);
+      renderGrid('mixGrid1', state.mixSel1, select1);
+      renderGrid('mixGrid2', state.mixSel2, select2);
+      renderMix();
+    }
+  }, 100);
+});
+
+// ---------- RENDER TOKEN SYSTEM ----------
+function generateRenderToken() {
+  return ++state.renderToken;
+}
+
+function isRenderValid(token) {
+  return token === state.renderToken;
+}
+
+// ---------- IMAGE HELPER ----------
+function clearImageHandlers(img) {
   if (!img) return;
+  img.onload = null;
+  img.onerror = null;
+}
+
+// ---------- MIX MODE (Stable) ----------
+async function renderMix() {
+  if (state.isRendering) return;
+  state.isRendering = true;
+  const token = generateRenderToken();
+
+  const img = getEl('mixResultImg');
+  if (!img) {
+    state.isRendering = false;
+    return;
+  }
+  
+  const spinner = getEl('mixSpinner');
+  const buttons = ['mixDownload', 'mixDownloadCard', 'mixCopy', 'mixWhatsapp', 'mixSave'];
+  
+  // Clear previous handlers
+  clearImageHandlers(img);
   
   img.classList.remove('show');
-  if (error) error.style.display = 'none';
+  setDisplay('mixError', 'none');
   if (spinner) spinner.classList.add('active');
-  
-  [down, downCard, copy, whatsapp, save].forEach(btn => { if (btn) btn.disabled = true; });
+  setButtonStates(buttons, true);
   
   try {
-    const objUrl = await fetchEmojiMix(mixSel1.code, mixSel2.code);
+    const objUrl = await fetchWithRetry(() => 
+      fetchEmojiMix(state.mixSel1.code, state.mixSel2.code)
+    );
+    
+    if (!isRenderValid(token)) {
+      state.isRendering = false;
+      return;
+    }
+    
     img.src = objUrl;
+    
     img.onload = () => {
+      if (!isRenderValid(token)) return;
       img.classList.add('show');
       if (spinner) spinner.classList.remove('active');
-      [down, downCard, copy, whatsapp, save].forEach(btn => { if (btn) btn.disabled = false; });
-      currentVoteCombo = { code1: mixSel1.code, code2: mixSel2.code };
+      setButtonStates(buttons, false);
+      state.currentVoteCombo = { 
+        code1: state.mixSel1.code, 
+        code2: state.mixSel2.code 
+      };
       playSound();
+      updateSEOUrl();
+      state.isRendering = false;
     };
-    if (img.complete) {
-      img.classList.add('show');
+    
+    img.onerror = () => {
+      state.isRendering = false;
+      if (!isRenderValid(token)) return;
       if (spinner) spinner.classList.remove('active');
-      [down, downCard, copy, whatsapp, save].forEach(btn => { if (btn) btn.disabled = false; });
+      setDisplay('mixError', 'block');
+    };
+    
+    if (img.complete) {
+      img.onload();
     }
   } catch(e) {
+    if (!isRenderValid(token)) return;
     if (spinner) spinner.classList.remove('active');
-    if (error) error.style.display = 'block';
+    setDisplay('mixError', 'block');
+    logger.error('Mix render error:', e);
+    state.isRendering = false;
   }
 }
 
 function randomMix() {
-  mixSel1 = emojiList[Math.floor(Math.random() * emojiList.length)];
-  mixSel2 = emojiList[Math.floor(Math.random() * emojiList.length)];
-  const el1 = getEl('mixSelected1'), el2 = getEl('mixSelected2');
-  if (el1) el1.textContent = mixSel1.emoji;
-  if (el2) el2.textContent = mixSel2.emoji;
-  renderGrid('mixGrid1', mixSel1, select1);
-  renderGrid('mixGrid2', mixSel2, select2);
+  state.mixSel1 = emojiList[Math.floor(Math.random() * emojiList.length)];
+  state.mixSel2 = emojiList[Math.floor(Math.random() * emojiList.length)];
+  setText('mixSelected1', state.mixSel1.emoji);
+  setText('mixSelected2', state.mixSel2.emoji);
+  renderGrid('mixGrid1', state.mixSel1, select1);
+  renderGrid('mixGrid2', state.mixSel2, select2);
   renderMix();
 }
 
 // ---------- BATTLE MODE ----------
 function generateBattle() {
   const e1 = emojiList[Math.floor(Math.random() * emojiList.length)];
-  let e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
-  while (e2.code === e1.code) e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
+  let e2;
+  do {
+    e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
+  } while (e2.code === e1.code);
   
-  const spinner = getEl('battleSpinner'), img = getEl('battleImg');
+  const spinner = getEl('battleSpinner');
+  const img = getEl('battleImg');
   const caption = getEl('battleCaption');
+  
+  clearImageHandlers(img);
+  
   if (spinner) spinner.classList.add('active');
   if (img) img.classList.remove('show');
   
-  fetchEmojiMix(e1.code, e2.code).then(objUrl => {
-    if (img) {
+  fetchEmojiMix(e1.code, e2.code)
+    .then(objUrl => {
+      if (!img || !img.isConnected) return;
       img.src = objUrl;
       img.onload = () => {
+        if (!img.isConnected) return;
         img.classList.add('show');
-        if (spinner) spinner.classList.remove('active');
-        if (caption) caption.textContent = `${e1.emoji} vs ${e2.emoji} – who wins?`;
+        if (spinner && spinner.isConnected) spinner.classList.remove('active');
+        if (caption && caption.isConnected) caption.textContent = `${e1.emoji} vs ${e2.emoji} – who wins?`;
         playSound();
       };
-    }
-  }).catch(() => generateBattle());
+      img.onerror = () => {
+        if (spinner && spinner.isConnected) spinner.classList.remove('active');
+      };
+    })
+    .catch(() => {
+      setTimeout(() => generateBattle(), 500);
+    });
 }
 
 // ---------- STORY MODE ----------
 function initStoryMode() {
   const selector = getEl('storySelector');
   if (!selector) return;
+  
+  const options = emojiList.map(e => `<option value="${e.code}">${e.emoji}</option>`).join('');
   selector.innerHTML = `
-    <select id="storySel1">${emojiList.map(e => `<option value="${e.code}">${e.emoji}</option>`).join('')}</select>
-    <select id="storySel2">${emojiList.map(e => `<option value="${e.code}">${e.emoji}</option>`).join('')}</select>
+    <select id="storySel1" aria-label="Select first emoji">${options}</select>
+    <select id="storySel2" aria-label="Select second emoji">${options}</select>
     <button class="btn" id="storyAdd">➕ Add</button>
   `;
   
   const addBtn = getEl('storyAdd');
-  if (addBtn) addBtn.onclick = async () => {
-    if (storyPairs.length >= 3) return alert('Max 3 panels');
-    const sel1 = getEl('storySel1'), sel2 = getEl('storySel2');
-    const c1 = sel1?.value, c2 = sel2?.value;
-    if (!c1 || !c2) return;
-    try {
-      const objUrl = await fetchEmojiMix(c1, c2);
-      storyPairs.push({ code1: c1, code2: c2, objUrl });
-      renderStoryStrip();
-      const downBtn = getEl('storyDownload');
-      if (downBtn) downBtn.disabled = false;
-      playSound();
-    } catch(e) { alert('Combo not available'); }
-  };
+  if (addBtn) {
+    addBtn.onclick = async () => {
+      if (state.storyPairs.length >= CONFIG.MAX_STORY_PANELS) {
+        return alert(`Max ${CONFIG.MAX_STORY_PANELS} panels allowed`);
+      }
+      const sel1 = getEl('storySel1'), sel2 = getEl('storySel2');
+      const c1 = sel1?.value, c2 = sel2?.value;
+      if (!c1 || !c2) return;
+      try {
+        const objUrl = await fetchWithRetry(() => fetchEmojiMix(c1, c2));
+        state.storyPairs.push({ code1: c1, code2: c2, objUrl });
+        renderStoryStrip();
+        const downBtn = getEl('storyDownload');
+        if (downBtn?.isConnected) downBtn.disabled = false;
+        playSound();
+      } catch(e) {
+        alert('This combo is not available. Try different emojis!');
+      }
+    };
+  }
   renderStoryStrip();
 }
 
 function renderStoryStrip() {
   const strip = getEl('storyStrip');
-  if (strip) strip.innerHTML = storyPairs.map(p => `<img src="${p.objUrl}" style="max-width:120px;border-radius:12px;">`).join('');
+  if (!strip?.isConnected) return;
+  strip.innerHTML = state.storyPairs.map(p => `<img src="${p.objUrl}" style="max-width:120px;border-radius:12px;" alt="Story panel" loading="lazy">`).join('');
 }
 
 // ---------- DAILY CHALLENGE ----------
 function initDailyChallenge() {
   const today = new Date().toDateString();
-  const seed = today.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+  const seed = [...today].reduce((a, b) => a + b.charCodeAt(0), 0);
   const e1 = emojiList[seed % emojiList.length];
   const e2 = emojiList[(seed * 7) % emojiList.length];
   
-  const setText = (id, text) => { const el = getEl(id); if (el) el.textContent = text; };
   setText('challengeEmoji1', e1.emoji);
   setText('challengeEmoji2', e2.emoji);
   setText('challengeDisplay1', e1.emoji);
@@ -241,45 +640,72 @@ function initDailyChallenge() {
   const mixBtn = getEl('challengeMixBtn');
   if (mixBtn) {
     mixBtn.onclick = async () => {
-      const sp = getEl('challengeSpinner'), img = getEl('challengeImg');
-      if (sp) sp.classList.add('active');
-      if (img) img.classList.remove('show');
+      const sp = getEl('challengeSpinner');
+      const img = getEl('challengeImg');
+      clearImageHandlers(img);
+      if (sp?.isConnected) sp.classList.add('active');
+      if (img?.isConnected) img.classList.remove('show');
       try {
-        const objUrl = await fetchEmojiMix(e1.code, e2.code);
-        if (img) {
+        const objUrl = await fetchWithRetry(() => fetchEmojiMix(e1.code, e2.code));
+        if (img?.isConnected) {
           img.src = objUrl;
           img.onload = () => {
+            if (!img.isConnected) return;
             img.classList.add('show');
-            if (sp) sp.classList.remove('active');
+            if (sp?.isConnected) sp.classList.remove('active');
             playSound();
+          };
+          img.onerror = () => {
+            if (sp?.isConnected) sp.classList.remove('active');
+            setDisplay('challengeError', 'block');
           };
         }
       } catch(e) {
-        if (sp) sp.classList.remove('active');
-        const err = getEl('challengeError');
-        if (err) err.style.display = 'block';
+        if (sp?.isConnected) sp.classList.remove('active');
+        setDisplay('challengeError', 'block');
       }
     };
   }
   
   const shareBtn = getEl('challengeShare');
-  if (shareBtn) shareBtn.onclick = () => window.open('https://twitter.com/intent/tweet?text=My%20%23EmojiKitchenDaily%20entry!');
+  if (shareBtn) {
+    shareBtn.onclick = () => {
+      window.open('https://twitter.com/intent/tweet?text=My%20%23EmojiKitchenDaily%20entry!', '_blank', 'noopener,noreferrer');
+    };
+  }
 }
 
-// ---------- WALL MODE ----------
-function loadWall() {
+// ---------- WALL MODE (Stable) ----------
+let wallRenderToken = 0;
+
+async function loadWall() {
+  const token = ++wallRenderToken;
   const wall = getEl('wallGrid');
-  if (!wall) return;
-  wall.innerHTML = '';
-  for (let i = 0; i < 8; i++) {
+  if (!wall?.isConnected) return;
+  
+  const fragment = document.createDocumentFragment();
+  
+  for (let i = 0; i < CONFIG.WALL_ITEMS; i++) {
+    if (token !== wallRenderToken) return; // Cancel if new render started
     const e1 = emojiList[Math.floor(Math.random() * emojiList.length)];
     const e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
     const div = document.createElement('div');
     div.className = 'wall-item';
     const img = document.createElement('img');
-    fetchEmojiMix(e1.code, e2.code).then(objUrl => img.src = objUrl).catch(() => {});
+    img.alt = `Emoji mix ${e1.emoji} + ${e2.emoji}`;
+    img.loading = 'lazy';
+    try {
+      const objUrl = await fetchEmojiMix(e1.code, e2.code);
+      if (token !== wallRenderToken) break;
+      img.src = objUrl;
+    } catch(e) { continue; }
     div.appendChild(img);
-    wall.appendChild(div);
+    fragment.appendChild(div);
+  }
+  
+  if (token === wallRenderToken && wall.isConnected) {
+    wall.innerHTML = '';
+    wall.appendChild(fragment);
   }
 }
 
@@ -287,275 +713,115 @@ function loadWall() {
 async function newGamePuzzle() {
   const e1 = emojiList[Math.floor(Math.random() * emojiList.length)];
   const e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
-  gameAnswer = { code1: e1.code, code2: e2.code };
+  state.gameAnswer = { code1: e1.code, code2: e2.code };
   try {
-    const objUrl = await fetchEmojiMix(e1.code, e2.code);
+    const objUrl = await fetchWithRetry(() => fetchEmojiMix(e1.code, e2.code));
     const blurImg = getEl('gameBlurImg');
-    if (blurImg) blurImg.src = objUrl;
-    const s1 = getEl('gameGuess1'), s2 = getEl('gameGuess2');
+    if (blurImg?.isConnected) blurImg.src = objUrl;
     const options = emojiList.map(e => `<option value="${e.code}">${e.emoji}</option>`).join('');
-    if (s1) s1.innerHTML = options;
-    if (s2) s2.innerHTML = options;
-    const fb = getEl('gameFeedback');
-    if (fb) fb.textContent = '';
-  } catch(e) { newGamePuzzle(); }
+    const s1 = getEl('gameGuess1'), s2 = getEl('gameGuess2');
+    if (s1?.isConnected) s1.innerHTML = options;
+    if (s2?.isConnected) s2.innerHTML = options;
+    setText('gameFeedback', '');
+  } catch(e) {
+    setTimeout(() => newGamePuzzle(), 300);
+  }
 }
 
-// ========== SMART AI MOOD DETECTION SYSTEM ==========
-
-const MOOD_CATEGORIES = [
-  {
-    name: "happy",
-    emojis: ["😊", "😄", "😃", "🥳", "🎉", "⭐", "🌈", "🤩", "😇", "💯"],
-    keywords: [
-      { word: "happy", weight: 10 },
-      { word: "joy", weight: 10 },
-      { word: "glad", weight: 9 },
-      { word: "cheerful", weight: 9 },
-      { word: "delighted", weight: 9 },
-      { word: "excited", weight: 8 },
-      { word: "great", weight: 7 },
-      { word: "awesome", weight: 7 },
-      { word: "wonderful", weight: 7 },
-      { word: "fantastic", weight: 7 },
-      { word: "smile", weight: 8 },
-      { word: "laugh", weight: 8 },
-      { word: "fun", weight: 6 },
-      { word: "positive", weight: 5 },
-      { word: "good", weight: 4 },
-      { word: "nice", weight: 3 },
-      { word: "blessed", weight: 6 },
-      { word: "grateful", weight: 5 },
-    ]
-  },
-  {
-    name: "sad",
-    emojis: ["😭", "😢", "😞", "😔", "😩", "😿", "💔", "🥺"],
-    keywords: [
-      { word: "sad", weight: 10 },
-      { word: "cry", weight: 10 },
-      { word: "crying", weight: 10 },
-      { word: "unhappy", weight: 9 },
-      { word: "depressed", weight: 9 },
-      { word: "upset", weight: 8 },
-      { word: "sorrow", weight: 9 },
-      { word: "grief", weight: 9 },
-      { word: "lonely", weight: 8 },
-      { word: "heartbreak", weight: 9 },
-      { word: "pain", weight: 6 },
-      { word: "hurt", weight: 6 },
-      { word: "miss", weight: 5 },
-    ]
-  },
-  {
-    name: "angry",
-    emojis: ["😡", "🤬", "😤", "💢", "👿", "😠", "💥"],
-    keywords: [
-      { word: "angry", weight: 10 },
-      { word: "mad", weight: 10 },
-      { word: "rage", weight: 10 },
-      { word: "furious", weight: 10 },
-      { word: "annoyed", weight: 8 },
-      { word: "frustrated", weight: 8 },
-      { word: "hate", weight: 9 },
-      { word: "irritated", weight: 8 },
-      { word: "fuming", weight: 9 },
-    ]
-  },
-  {
-    name: "funny",
-    emojis: ["😂", "🤣", "😆", "😜", "🤪", "😹", "💀", "🤡"],
-    keywords: [
-      { word: "funny", weight: 10 },
-      { word: "lol", weight: 10 },
-      { word: "haha", weight: 10 },
-      { word: "joke", weight: 9 },
-      { word: "hilarious", weight: 10 },
-      { word: "silly", weight: 8 },
-      { word: "goofy", weight: 8 },
-      { word: "crazy", weight: 6 },
-      { word: "wild", weight: 5 },
-      { word: "meme", weight: 8 },
-      { word: "rofl", weight: 10 },
-    ]
-  },
-  {
-    name: "party",
-    emojis: ["🎉", "🥳", "🎂", "🎈", "🎊", "🍾", "💃", "🕺", "🎶"],
-    keywords: [
-      { word: "party", weight: 10 },
-      { word: "celebrate", weight: 10 },
-      { word: "birthday", weight: 10 },
-      { word: "dance", weight: 9 },
-      { word: "festival", weight: 9 },
-      { word: "fun", weight: 7 },
-      { word: "weekend", weight: 7 },
-      { word: "event", weight: 6 },
-      { word: "cheers", weight: 8 },
-    ]
-  },
-  {
-    name: "scary",
-    emojis: ["😱", "👻", "💀", "🎃", "😨", "😰", "🕷️", "🕸️"],
-    keywords: [
-      { word: "scary", weight: 10 },
-      { word: "fear", weight: 10 },
-      { word: "horror", weight: 10 },
-      { word: "spooky", weight: 10 },
-      { word: "creepy", weight: 10 },
-      { word: "terrified", weight: 10 },
-      { word: "ghost", weight: 10 },
-      { word: "haunted", weight: 9 },
-      { word: "nightmare", weight: 9 },
-    ]
-  },
-  {
-    name: "food",
-    emojis: ["🍕", "🍔", "🍦", "🍩", "🌮", "🍿", "☕", "🍪", "🎂"],
-    keywords: [
-      { word: "food", weight: 10 },
-      { word: "hungry", weight: 10 },
-      { word: "pizza", weight: 10 },
-      { word: "burger", weight: 10 },
-      { word: "eat", weight: 9 },
-      { word: "tasty", weight: 9 },
-      { word: "delicious", weight: 9 },
-      { word: "yummy", weight: 9 },
-      { word: "meal", weight: 8 },
-      { word: "snack", weight: 8 },
-      { word: "ice cream", weight: 10 },
-      { word: "coffee", weight: 9 },
-      { word: "cake", weight: 9 },
-    ]
-  },
-  {
-    name: "animals",
-    emojis: ["🐶", "🐱", "🐼", "🦊", "🐨", "🐸", "🦁", "🐯", "🐰"],
-    keywords: [
-      { word: "animal", weight: 10 },
-      { word: "dog", weight: 10 },
-      { word: "cat", weight: 10 },
-      { word: "pet", weight: 9 },
-      { word: "puppy", weight: 10 },
-      { word: "kitten", weight: 10 },
-      { word: "cute animal", weight: 9 },
-      { word: "wild", weight: 7 },
-      { word: "zoo", weight: 8 },
-      { word: "panda", weight: 10 },
-      { word: "fox", weight: 10 },
-    ]
-  }
-];
+// ========== AI MOOD DETECTION ==========
+const MOOD_CATEGORIES = Object.freeze([
+  { name: "happy", emojis: ["😊","😄","😃","🥳","🎉","⭐","🌈","🤩","😇","💯"], keywords: new Map([["happy",10],["joy",10],["glad",9],["cheerful",9],["delighted",9],["excited",8],["great",7],["awesome",7],["wonderful",7],["fantastic",7],["smile",8],["laugh",8],["fun",6],["positive",5],["good",4],["nice",3],["blessed",6],["grateful",5]]) },
+  { name: "sad", emojis: ["😭","😢","😞","😔","😩","😿","💔","🥺"], keywords: new Map([["sad",10],["cry",10],["crying",10],["unhappy",9],["depressed",9],["upset",8],["sorrow",9],["grief",9],["lonely",8],["heartbreak",9],["pain",6],["hurt",6],["miss",5]]) },
+  { name: "angry", emojis: ["😡","🤬","😤","💢","👿","😠","💥"], keywords: new Map([["angry",10],["mad",10],["rage",10],["furious",10],["annoyed",8],["frustrated",8],["hate",9],["irritated",8],["fuming",9]]) },
+  { name: "funny", emojis: ["😂","🤣","😆","😜","🤪","😹","💀","🤡"], keywords: new Map([["funny",10],["lol",10],["haha",10],["joke",9],["hilarious",10],["silly",8],["goofy",8],["crazy",6],["wild",5],["meme",8],["rofl",10]]) },
+  { name: "party", emojis: ["🎉","🥳","🎂","🎈","🎊","🍾","💃","🕺","🎶"], keywords: new Map([["party",10],["celebrate",10],["birthday",10],["dance",9],["festival",9],["fun",7],["weekend",7],["event",6],["cheers",8]]) },
+  { name: "scary", emojis: ["😱","👻","💀","🎃","😨","😰"], keywords: new Map([["scary",10],["fear",10],["horror",10],["spooky",10],["creepy",10],["terrified",10],["ghost",10],["haunted",9],["nightmare",9]]) },
+  { name: "food", emojis: ["🍕","🍔","🍦","🍩","🌮","🍿","☕","🍪","🎂"], keywords: new Map([["food",10],["hungry",10],["pizza",10],["burger",10],["eat",9],["tasty",9],["delicious",9],["yummy",9],["meal",8],["snack",8],["ice cream",10],["coffee",9],["cake",9]]) },
+  { name: "animals", emojis: ["🐶","🐱","🐼","🦊","🐨","🐸","🦁","🐯","🐰"], keywords: new Map([["animal",10],["dog",10],["cat",10],["pet",9],["puppy",10],["kitten",10],["cute animal",9],["wild",7],["zoo",8],["panda",10],["fox",10]]) }
+]);
 
 function detectMood(prompt) {
+  const cacheKey = prompt.slice(0, 30);
+  if (moodCache.has(cacheKey)) return moodCache.get(cacheKey);
   const promptLower = prompt.toLowerCase();
-  let bestCategory = null;
-  let bestScore = 0;
-
-  MOOD_CATEGORIES.forEach(category => {
+  let bestCategory = MOOD_CATEGORIES[0], bestScore = 0;
+  for (const category of MOOD_CATEGORIES) {
     let categoryScore = 0;
-    category.keywords.forEach(kw => {
-      if (promptLower.includes(kw.word)) {
-        categoryScore += kw.weight;
-      }
-    });
-    if (categoryScore > bestScore) {
-      bestScore = categoryScore;
-      bestCategory = category;
+    for (const [keyword, weight] of category.keywords) {
+      if (promptLower.includes(keyword)) categoryScore += weight;
     }
-  });
-
-  // If no strong match found, default to "happy"
-  if (!bestCategory || bestScore < 3) {
-    bestCategory = MOOD_CATEGORIES.find(c => c.name === "happy");
+    if (categoryScore > bestScore) { bestScore = categoryScore; bestCategory = category; }
   }
-
-  return bestCategory;
+  const result = bestScore >= CONFIG.FALLBACK_MIN_SCORE ? bestCategory : MOOD_CATEGORIES[0];
+  moodCache.set(cacheKey, result);
+  return result;
 }
 
 function getRandomEmojiFromCategory(category) {
   const emojiChar = category.emojis[Math.floor(Math.random() * category.emojis.length)];
-  const found = emojiList.find(e => e.emoji === emojiChar);
-  return found || emojiList[0];
+  return emojiList.find(e => e.emoji === emojiChar) || emojiList[0];
 }
 
 function getSecondEmoji(firstEmoji, prompt) {
   const promptLower = prompt.toLowerCase();
-
-  // If prompt mentions two moods/things, try to find second category
   const allMatches = [];
-  MOOD_CATEGORIES.forEach(category => {
+  for (const category of MOOD_CATEGORIES) {
     let score = 0;
-    category.keywords.forEach(kw => {
-      if (promptLower.includes(kw.word)) {
-        score += kw.weight;
-      }
-    });
-    if (score >= 3) {
-      allMatches.push({ category, score });
+    for (const [keyword, weight] of category.keywords) {
+      if (promptLower.includes(keyword)) score += weight;
     }
-  });
-
-  // Sort by score descending
-  allMatches.sort((a, b) => b.score - a.score);
-
-  // If we have at least 2 different categories, pick from second one
-  if (allMatches.length >= 2) {
-    const secondCategory = allMatches[1].category;
-    if (secondCategory.name !== allMatches[0].category.name) {
-      const emojiChar = secondCategory.emojis[Math.floor(Math.random() * secondCategory.emojis.length)];
-      const found = emojiList.find(e => e.emoji === emojiChar);
-      if (found && found.code !== firstEmoji.code) {
-        return found;
-      }
-    }
+    if (score >= CONFIG.FALLBACK_MIN_SCORE) allMatches.push({ category, score });
   }
-
-  // Otherwise pick a random emoji from the same category (but different)
-  const firstCategory = allMatches[0]?.category || MOOD_CATEGORIES[0];
-  const otherEmojis = firstCategory.emojis.filter(e => e !== firstEmoji.emoji);
+  allMatches.sort((a, b) => b.score - a.score);
+  if (allMatches.length >= 2 && allMatches[1].category.name !== allMatches[0].category.name) {
+    const secondCat = allMatches[1].category;
+    const emojiChar = secondCat.emojis[Math.floor(Math.random() * secondCat.emojis.length)];
+    const found = emojiList.find(e => e.emoji === emojiChar);
+    if (found && found.code !== firstEmoji.code) return found;
+  }
+  const firstCat = allMatches[0]?.category || MOOD_CATEGORIES[0];
+  const otherEmojis = firstCat.emojis.filter(e => e !== firstEmoji.emoji);
   if (otherEmojis.length > 0) {
     const emojiChar = otherEmojis[Math.floor(Math.random() * otherEmojis.length)];
     const found = emojiList.find(e => e.emoji === emojiChar);
     if (found) return found;
   }
-
-  // Fallback: random from entire list
-  const others = emojiList.filter(e => e.code !== firstEmoji.code);
-  return others[Math.floor(Math.random() * others.length)];
+  return emojiList.filter(e => e.code !== firstEmoji.code)[Math.floor(Math.random() * (emojiList.length - 1))] || emojiList[0];
 }
 
-// ---------- AI MODE (REAL OPENAI + SMART FALLBACK) ----------
+// ---------- AI MODE ----------
 async function aiGenerate() {
+  if (state.aiRequestInFlight) return;
   const prompt = getEl('aiPrompt')?.value.trim();
   if (!prompt) return alert("Please describe a feeling or mood!");
-
+  state.aiRequestInFlight = true;
   const sp = getEl('aiSpinner'), img = getEl('aiImg');
-  if (sp) sp.classList.add('active');
-  if (img) img.classList.remove('show');
-
+  clearImageHandlers(img);
+  if (sp?.isConnected) sp.classList.add('active');
+  if (img?.isConnected) img.classList.remove('show');
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CONFIG.AI_TIMEOUT_MS);
   try {
-    // Try OpenAI first
     const response = await fetch("/api/ai-generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }), signal: controller.signal
     });
+    clearTimeout(timeoutId);
+    if (!response.ok) throw new Error(`API returned ${response.status}`);
     const data = await response.json();
     if (data.error) throw new Error(data.error);
-    
     const objUrl = await fetchEmojiMix(data.code1, data.code2);
-    if (img) {
+    if (img?.isConnected) {
       img.src = objUrl;
-      img.onload = () => {
-        img.classList.add('show');
-        if (sp) sp.classList.remove('active');
-        playSound();
-      };
+      img.onload = () => { if (img.isConnected) { img.classList.add('show'); if (sp?.isConnected) sp.classList.remove('active'); playSound(); } };
+      img.onerror = () => { if (sp?.isConnected) sp.classList.remove('active'); };
     }
   } catch (e) {
-    console.log("OpenAI failed, using smart fallback...", e.message);
+    logger.warn("OpenAI failed, using smart fallback...");
     await aiSmartFallback(prompt, sp, img);
+  } finally {
+    clearTimeout(timeoutId);
+    state.aiRequestInFlight = false;
   }
 }
 
@@ -564,271 +830,309 @@ async function aiSmartFallback(prompt, sp, img) {
     const category = detectMood(prompt);
     const e1 = getRandomEmojiFromCategory(category);
     const e2 = getSecondEmoji(e1, prompt);
-    
     const objUrl = await fetchEmojiMix(e1.code, e2.code);
-    if (img) {
+    if (img?.isConnected) {
       img.src = objUrl;
-      img.onload = () => {
-        img.classList.add('show');
-        if (sp) sp.classList.remove('active');
-        playSound();
-      };
+      img.onload = () => { if (img.isConnected) { img.classList.add('show'); if (sp?.isConnected) sp.classList.remove('active'); playSound(); } };
+      img.onerror = () => { if (sp?.isConnected) sp.classList.remove('active'); };
     }
   } catch (error) {
-    if (sp) sp.classList.remove('active');
+    if (sp?.isConnected) sp.classList.remove('active');
     alert("AI mix failed, try a different description!");
-    console.error("AI Fallback Error:", error);
+    logger.error("AI Fallback Error:", error);
   }
 }
 
-// ---------- TRENDING ----------
-function loadTrending() {
+// ---------- TRENDING (Stable) ----------
+let trendingRenderToken = 0;
+
+async function loadTrending() {
+  const token = ++trendingRenderToken;
   const container = getEl('trendingList');
-  if (!container) return;
-  container.innerHTML = '';
-  trendingCombos.forEach(async c => {
+  if (!container?.isConnected) return;
+  const fragment = document.createDocumentFragment();
+  for (const c of trendingCombos) {
+    if (token !== trendingRenderToken) return;
     const div = document.createElement('div');
     div.className = 'trending-item';
     try {
       const objUrl = await fetchEmojiMix(c.code1, c.code2);
+      if (token !== trendingRenderToken) break;
       const img = document.createElement('img');
       img.src = objUrl;
-      img.style.width = '60px';
-      img.style.borderRadius = '12px';
+      img.alt = `Trending emoji mix`;
+      img.loading = 'lazy';
+      img.style.cssText = 'width:60px;border-radius:12px;';
       div.appendChild(img);
+      fragment.appendChild(div);
     } catch(e) {}
-    container.appendChild(div);
-  });
+  }
+  if (token === trendingRenderToken && container.isConnected) {
+    container.innerHTML = '';
+    container.appendChild(fragment);
+  }
 }
 
-// ---------- FAVORITES ----------
-function renderFavorites() {
+// ---------- FAVORITES (Stable) ----------
+let favoritesRenderToken = 0;
+
+async function renderFavorites() {
+  const token = ++favoritesRenderToken;
   const container = getEl('favoritesList');
-  if (!container) return;
-  container.innerHTML = '';
-  getFavorites().forEach(async f => {
+  if (!container?.isConnected) return;
+  const favs = getFavorites();
+  if (favs.length === 0) {
+    if (token === favoritesRenderToken && container.isConnected) {
+      container.innerHTML = '<p style="color:var(--subtext);text-align:center;">No saved combos yet. Mix and save your favorites! ❤️</p>';
+    }
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const f of favs) {
+    if (token !== favoritesRenderToken) return;
     const div = document.createElement('div');
     div.className = 'fav-item';
     try {
       const objUrl = await fetchEmojiMix(f.code1, f.code2);
+      if (token !== favoritesRenderToken) break;
       const img = document.createElement('img');
       img.src = objUrl;
+      img.alt = 'Saved combo';
+      img.loading = 'lazy';
       const del = document.createElement('button');
-      del.textContent = 'x';
+      del.textContent = '×';
+      del.setAttribute('aria-label', 'Remove from favorites');
       del.onclick = () => removeFavorite(f.code1, f.code2);
       div.appendChild(img);
       div.appendChild(del);
-      container.appendChild(div);
+      fragment.appendChild(div);
     } catch(e) {}
-  });
+  }
+  if (token === favoritesRenderToken && container.isConnected) {
+    container.innerHTML = '';
+    container.appendChild(fragment);
+  }
 }
 
 // ---------- SHARE FUNCTIONS ----------
 async function shareComboCard(imgUrl, e1, e2) {
   const canvas = document.createElement("canvas");
+  canvas.width = 500; canvas.height = 500;
   const ctx = canvas.getContext("2d");
-  canvas.width = 500;
-  canvas.height = 500;
   ctx.fillStyle = "#111";
   ctx.fillRect(0, 0, 500, 500);
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = imgUrl;
-  img.onload = () => {
+  try {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = imgUrl; });
     ctx.drawImage(img, 100, 120, 300, 300);
     ctx.fillStyle = "#fff";
     ctx.font = "bold 20px Inter, Arial";
     ctx.textAlign = "center";
     ctx.fillText("Emoji Kitchen Pro", 250, 40);
     ctx.font = "30px Inter, Arial";
-    ctx.fillText(e1 + " + " + e2, 250, 460);
-    const link = document.createElement("a");
-    link.download = "emoji-card.png";
-    link.href = canvas.toDataURL();
-    link.click();
-  };
+    ctx.fillText(`${e1} + ${e2}`, 250, 460);
+    canvas.toBlob((blob) => {
+      const url = createSafeObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = "emoji-card.png";
+      link.href = url;
+      link.click();
+      setTimeout(() => revokeObjectURLSafe(url), 1000);
+    }, 'image/png');
+  } catch (e) {
+    logger.error('Card generation failed:', e);
+    alert('Could not generate card. Please try again.');
+  }
 }
 
 function shareSite() {
   const url = window.location.href;
   if (navigator.share) {
-    navigator.share({
-      title: "Emoji Kitchen Pro",
-      text: "Check this fun emoji mixer!",
-      url: url
-    }).catch(() => {});
+    navigator.share({ title: "Emoji Kitchen Pro", text: "Check this fun emoji mixer!", url: url }).catch(() => {});
   } else {
-    navigator.clipboard.writeText(url).then(() => alert("Link copied! Share it anywhere 🚀"));
+    navigator.clipboard.writeText(url).then(() => alert("Link copied! Share it anywhere 🚀")).catch(() => alert("Could not copy link."));
   }
 }
 
 function scrollToTool() {
   const tool = getEl('tool');
-  if (tool) tool.scrollIntoView({ behavior: 'smooth' });
+  if (tool) tool.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function voteCombo(up) {
-  if (currentVoteCombo) {
-    votes += up ? 1 : -1;
-    const vc = getEl('voteCount');
-    if (vc) vc.textContent = votes;
+  if (state.currentVoteCombo) {
+    state.votes += up ? CONFIG.VOTE_INCREMENT : -CONFIG.VOTE_INCREMENT;
+    setText('voteCount', state.votes);
+    storage.set(CONFIG.STORAGE_KEYS.VOTES, state.votes);
   }
 }
 
 // ---------- TAB SWITCHING ----------
 function setupTabs() {
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      const mode = tab.dataset.mode;
-      document.querySelectorAll('.mode-content').forEach(m => m.classList.remove('active'));
-      const modeEl = getEl(`mode-${mode}`);
-      if (modeEl) modeEl.classList.add('active');
-
-      switch(mode) {
-        case 'battle': generateBattle(); break;
-        case 'wall': loadWall(); break;
-        case 'challenge': initDailyChallenge(); break;
-        case 'game': newGamePuzzle(); break;
-        case 'story': initStoryMode(); break;
-        case 'trending': loadTrending(); break;
-        case 'favorites': renderFavorites(); break;
-      }
-    });
+  const tabContainer = getEl('tabNav');
+  if (!tabContainer) return;
+  tabContainer.addEventListener('click', (e) => {
+    const tab = e.target.closest('.tab');
+    if (!tab) return;
+    document.querySelectorAll('.tab').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+    tab.classList.add('active');
+    tab.setAttribute('aria-selected', 'true');
+    const mode = tab.dataset.mode;
+    document.querySelectorAll('.mode-content').forEach(m => m.classList.remove('active'));
+    const modeEl = getEl(`mode-${mode}`);
+    if (modeEl) modeEl.classList.add('active');
+    switch(mode) {
+      case 'battle': generateBattle(); break;
+      case 'wall': loadWall(); break;
+      case 'challenge': initDailyChallenge(); break;
+      case 'game': newGamePuzzle(); break;
+      case 'story': initStoryMode(); break;
+      case 'trending': loadTrending(); break;
+      case 'favorites': renderFavorites(); break;
+    }
   });
 }
 
 // ---------- EVENT LISTENERS ----------
 function setupEventListeners() {
-  const scrollBtn = getEl('scrollToToolBtn');
-  if (scrollBtn) scrollBtn.addEventListener('click', scrollToTool);
-
-  const darkBtn = getEl('toggleDarkModeBtn');
-  if (darkBtn) darkBtn.addEventListener('click', toggleDarkMode);
-  
-  const themeFloat = getEl('themeToggleFloat');
-  if (themeFloat) themeFloat.addEventListener('click', toggleDarkMode);
-
-  const randomBtn = getEl('randomMixBtn');
-  if (randomBtn) randomBtn.addEventListener('click', randomMix);
-
-  const mixDownload = getEl('mixDownload');
-  if (mixDownload) mixDownload.addEventListener('click', () => {
-    const img = getEl('mixResultImg');
-    if (img?.src) {
-      const a = document.createElement('a');
-      a.href = img.src;
-      a.download = `emojimix-${mixSel1.emoji}-${mixSel2.emoji}.png`;
-      a.click();
+  document.addEventListener('click', (e) => {
+    const target = e.target;
+    const id = target.id || target.closest('[id]')?.id;
+    if (!id) return;
+    const handledIds = ['scrollToToolBtn','toggleDarkModeBtn','themeToggleFloat','randomMixBtn','mixDownload','mixDownloadCard','mixCopy','mixWhatsapp','mixSave','voteUpBtn','voteDownBtn','battleAgain','battleShare','storyReset','storyDownload','wallRefresh','gameSubmit','gameNew','aiGenerate','clearFavorites','shareToolBtn'];
+    if (handledIds.includes(id)) {
+      e.preventDefault();
+      handleButtonClick(id);
     }
   });
 
-  const mixCard = getEl('mixDownloadCard');
-  if (mixCard) mixCard.addEventListener('click', () => {
-    const img = getEl('mixResultImg');
-    if (img?.src) shareComboCard(img.src, mixSel1.emoji, mixSel2.emoji);
+  ['mixSearch1','mixSearch2'].forEach((inputId, i) => {
+    const input = getEl(inputId);
+    if (!input) return;
+    let debounceTimer;
+    const gridId = i === 0 ? 'mixGrid1' : 'mixGrid2';
+    input.addEventListener('input', (e) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => window.filterGrid(gridId, e.target.value), 150);
+    });
   });
+}
 
-  const mixCopy = getEl('mixCopy');
-  if (mixCopy) mixCopy.addEventListener('click', () => navigator.clipboard.writeText(window.location.href));
-
-  const mixWA = getEl('mixWhatsapp');
-  if (mixWA) mixWA.addEventListener('click', () => {
-    window.open(`https://wa.me/?text=Check%20this%20emoji%20mix!%20${encodeURIComponent(window.location.href)}`);
-  });
-
-  const mixSave = getEl('mixSave');
-  if (mixSave) mixSave.addEventListener('click', () => saveFavorite(mixSel1.code, mixSel2.code));
-
-  const voteUp = getEl('voteUpBtn'), voteDown = getEl('voteDownBtn');
-  if (voteUp) voteUp.addEventListener('click', () => voteCombo(true));
-  if (voteDown) voteDown.addEventListener('click', () => voteCombo(false));
-
-  const battleAgain = getEl('battleAgain');
-  if (battleAgain) battleAgain.addEventListener('click', generateBattle);
-  
-  const battleShare = getEl('battleShare');
-  if (battleShare) battleShare.addEventListener('click', () => {
-    window.open(`https://twitter.com/intent/tweet?text=Emoji%20battle!%20${encodeURIComponent(window.location.href)}`);
-  });
-
-  const storyReset = getEl('storyReset');
-  if (storyReset) storyReset.addEventListener('click', () => {
-    storyPairs = [];
-    renderStoryStrip();
-    const sd = getEl('storyDownload');
-    if (sd) sd.disabled = true;
-  });
-  
-  const storyDownload = getEl('storyDownload');
-  if (storyDownload) storyDownload.addEventListener('click', () => alert('Story download coming soon'));
-
-  const wallRefresh = getEl('wallRefresh');
-  if (wallRefresh) wallRefresh.addEventListener('click', loadWall);
-
-  const gameSubmit = getEl('gameSubmit');
-  if (gameSubmit) gameSubmit.addEventListener('click', () => {
-    const g1 = getEl('gameGuess1')?.value, g2 = getEl('gameGuess2')?.value;
-    const fb = getEl('gameFeedback'), gs = getEl('gameScore');
-    if (g1 && g2 && ((g1===gameAnswer.code1 && g2===gameAnswer.code2) || (g1===gameAnswer.code2 && g2===gameAnswer.code1))) {
-      gameScore += 10;
-      if (fb) fb.textContent = '✅ Correct! +10';
-    } else {
-      if (fb) fb.textContent = '❌ Try again';
+function handleButtonClick(id) {
+  switch(id) {
+    case 'scrollToToolBtn': scrollToTool(); break;
+    case 'toggleDarkModeBtn': case 'themeToggleFloat': toggleDarkMode(); break;
+    case 'randomMixBtn': randomMix(); break;
+    case 'mixDownload': { const img = getEl('mixResultImg'); if (img?.src) { const a = document.createElement('a'); a.href = img.src; a.download = `emojimix-${state.mixSel1.emoji}-${state.mixSel2.emoji}.png`; a.click(); } break; }
+    case 'mixDownloadCard': { const img = getEl('mixResultImg'); if (img?.src) shareComboCard(img.src, state.mixSel1.emoji, state.mixSel2.emoji); break; }
+    case 'mixCopy': navigator.clipboard.writeText(window.location.href); break;
+    case 'mixWhatsapp': window.open(`https://wa.me/?text=Check%20this%20emoji%20mix!%20${encodeURIComponent(window.location.href)}`, '_blank', 'noopener,noreferrer'); break;
+    case 'mixSave': saveFavorite(state.mixSel1.code, state.mixSel2.code); break;
+    case 'voteUpBtn': voteCombo(true); break;
+    case 'voteDownBtn': voteCombo(false); break;
+    case 'battleAgain': generateBattle(); break;
+    case 'battleShare': window.open(`https://twitter.com/intent/tweet?text=Emoji%20battle!%20${encodeURIComponent(window.location.href)}`, '_blank', 'noopener,noreferrer'); break;
+    case 'storyReset': state.storyPairs = []; renderStoryStrip(); const sd = getEl('storyDownload'); if (sd?.isConnected) sd.disabled = true; break;
+    case 'storyDownload': alert('Story download coming soon! 🚀'); break;
+    case 'wallRefresh': loadWall(); break;
+    case 'gameSubmit': {
+      const g1 = getEl('gameGuess1')?.value, g2 = getEl('gameGuess2')?.value;
+      if (g1 && g2 && ((g1 === state.gameAnswer.code1 && g2 === state.gameAnswer.code2) || (g1 === state.gameAnswer.code2 && g2 === state.gameAnswer.code1))) {
+        state.gameScore += CONFIG.GAME_SCORE_INCREMENT;
+        setText('gameFeedback', '✅ Correct! +10');
+      } else setText('gameFeedback', '❌ Try again');
+      setText('gameScore', state.gameScore);
+      playSound();
+      break;
     }
-    if (gs) gs.textContent = gameScore;
-    playSound();
-  });
-  
-  const gameNew = getEl('gameNew');
-  if (gameNew) gameNew.addEventListener('click', newGamePuzzle);
-
-  const aiBtn = getEl('aiGenerate');
-  if (aiBtn) aiBtn.addEventListener('click', aiGenerate);
-
-  const search1 = getEl('mixSearch1'), search2 = getEl('mixSearch2');
-  if (search1) search1.addEventListener('input', (e) => window.filterGrid('mixGrid1', e.target.value));
-  if (search2) search2.addEventListener('input', (e) => window.filterGrid('mixGrid2', e.target.value));
-
-  const clearFav = getEl('clearFavorites');
-  if (clearFav) clearFav.addEventListener('click', () => {
-    localStorage.removeItem('emojifavs');
-    renderFavorites();
-  });
-
-  const shareTool = getEl('shareToolBtn');
-  if (shareTool) shareTool.addEventListener('click', shareSite);
+    case 'gameNew': newGamePuzzle(); break;
+    case 'aiGenerate': aiGenerate(); break;
+    case 'clearFavorites': storage.remove(CONFIG.STORAGE_KEYS.FAVORITES); renderFavorites(); break;
+    case 'shareToolBtn': shareSite(); break;
+  }
 }
 
 // ---------- PWA ----------
 function setupPWA() {
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/service-worker.js")
-        .then(() => console.log("PWA Ready"))
-        .catch(err => console.log("SW Error:", err));
-    });
+  if (!("serviceWorker" in navigator)) return;
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js")
+      .then(registration => {
+        logger.info("PWA Ready:", registration.scope);
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker?.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              logger.info('New version available!');
+            }
+          });
+        });
+      })
+      .catch(err => logger.warn("SW registration failed:", err));
+  });
+}
+
+// ---------- ACCESSIBILITY ----------
+function setupAccessibility() {
+  const skipLink = document.createElement('a');
+  skipLink.href = '#tool';
+  skipLink.style.cssText = 'position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;';
+  skipLink.textContent = 'Skip to main content';
+  document.body.insertBefore(skipLink, document.body.firstChild);
+}
+
+// ---------- MEMORY MANAGEMENT ----------
+function setupMemoryManagement() {
+  window.addEventListener('beforeunload', () => {
+    cleanupAllObjectURLs();
+    moodCache.clear();
+    emojiCache.forEach(entry => revokeObjectURLSafe(entry.url));
+    emojiCache.clear();
+    globalCleanupTasks.forEach(fn => fn());
+    globalCleanupTasks.length = 0;
+  });
+}
+
+// ---------- LAZY INITIALIZATION ----------
+function scheduleLazyTask(fn, delay = 0) {
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(() => setTimeout(fn, delay), { timeout: 2000 });
+  } else {
+    setTimeout(fn, delay + 100);
   }
 }
 
 // ---------- INITIALIZATION ----------
 function init() {
-  renderGrid('mixGrid1', mixSel1, select1);
-  renderGrid('mixGrid2', mixSel2, select2);
-  const el1 = getEl('mixSelected1'), el2 = getEl('mixSelected2');
-  if (el1) el1.textContent = mixSel1.emoji;
-  if (el2) el2.textContent = mixSel2.emoji;
+  loadTheme();
+  
+  renderGrid('mixGrid1', state.mixSel1, select1);
+  renderGrid('mixGrid2', state.mixSel2, select2);
+  setText('mixSelected1', state.mixSel1.emoji);
+  setText('mixSelected2', state.mixSel2.emoji);
+  
   renderMix();
 
   setupTabs();
   setupEventListeners();
   setupPWA();
+  setupAccessibility();
+  setupMemoryManagement();
 
-  loadWall();
-  initDailyChallenge();
-  loadTrending();
-  renderFavorites();
+  setText('voteCount', state.votes);
+
+  // Stagger heavy startup tasks
+  scheduleLazyTask(() => loadWall(), 0);
+  scheduleLazyTask(() => initDailyChallenge(), 50);
+  scheduleLazyTask(() => loadTrending(), 100);
+  scheduleLazyTask(() => renderFavorites(), 150);
+  
+  logger.info('Emoji Kitchen Pro initialized');
 }
 
-document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
