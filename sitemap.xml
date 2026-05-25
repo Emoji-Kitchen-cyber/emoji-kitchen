@@ -1,9 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-
-<url>
-<loc>https://emoji-kitchen-beta.vercel.app/</loc>
-<priority>1.0</priority>
-</url>
-
+  <url>
+    <loc>https://emoji-kitchen-beta.vercel.app/</loc>
+    <lastmod>2025-05-25</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://emoji-kitchen-beta.vercel.app/privacy-policy.html</loc>
+    <lastmod>2025-05-25</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://emoji-kitchen-beta.vercel.app/emoji-mix/fire-heart</loc>
+    <lastmod>2025-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://emoji-kitchen-beta.vercel.app/emoji-mix/laugh-heart</loc>
+    <lastmod>2025-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://emoji-kitchen-beta.vercel.app/emoji-mix/dog-cat</loc>
+    <lastmod>2025-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://emoji-kitchen-beta.vercel.app/emoji-mix/party-cake</loc>
+    <lastmod>2025-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://emoji-kitchen-beta.vercel.app/emoji-mix/love-fire</loc>
+    <lastmod>2025-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://emoji-kitchen-beta.vercel.app/emoji-mix/smile-kiss</loc>
+    <lastmod>2025-05-25</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>
