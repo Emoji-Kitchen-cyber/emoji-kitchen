@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /api/
 
 Sitemap: https://emoji-kitchen-beta.vercel.app/sitemap.xml
