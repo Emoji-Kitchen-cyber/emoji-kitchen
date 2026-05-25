@@ -1,4 +1,4 @@
-// ==================== EMOJI KITCHEN PRO - PRODUCTION APP ====================
+// ==================== EMOJI KITCHEN PRO - FINAL PRODUCTION ====================
 
 // ---------- CONFIGURATION ----------
 const CONFIG = {
@@ -8,18 +8,13 @@ const CONFIG = {
   WALL_ITEMS: 8,
   VOTE_INCREMENT: 1,
   GAME_SCORE_INCREMENT: 10,
-  AI_MODEL: 'gpt-4o-mini',
-  AI_MAX_TOKENS: 50,
-  AI_TEMPERATURE: 0.9,
   FALLBACK_MIN_SCORE: 3,
-  CACHE_PREFIX: 'emoji_kitchen_',
-  STORAGE_KEYS: { FAVORITES: 'emojifavs', THEME: 'theme', VOTES: 'votes' },
   AI_TIMEOUT_MS: 15000,
   CACHE_MAX_AGE_MS: 600000,
   CACHE_MAX_SIZE: 250
 };
 
-// ---------- DATA (250+ Emojis) ----------
+// ---------- DATA (265+ Emojis) ----------
 const emojiList = Object.freeze([
   { emoji:"😀", code:"1f600" },{ emoji:"😃", code:"1f603" },{ emoji:"😄", code:"1f604" },
   { emoji:"😁", code:"1f601" },{ emoji:"😅", code:"1f605" },{ emoji:"🤣", code:"1f923" },
@@ -130,6 +125,84 @@ const trendingCombos = Object.freeze([
   { code1:"1f970", code2:"1f618" },{ code1:"1f389", code2:"1f382" }
 ]);
 
+// ---------- FRIENDLY EMOJI NAMES (For SEO URLs) ----------
+const FRIENDLY_NAMES = {
+  "1f600":"grin","1f603":"big-eyes","1f604":"happy","1f601":"smile-eyes",
+  "1f605":"sweat-smile","1f923":"rofl","1f602":"laugh","1f60a":"smile",
+  "1f607":"angel","1f970":"love-face","1f60d":"heart-eyes","1f929":"star-struck",
+  "1f618":"kiss","1f617":"kissing","1f61a":"kiss-closed","1f60b":"yum",
+  "1f61b":"tongue","1f61c":"wink-tongue","1f92a":"crazy","1f61d":"tight",
+  "1f911":"money","1f917":"hug","1f92d":"hand-mouth","1f92b":"shush",
+  "1f914":"think","1f910":"zipper","1f928":"raised-eyebrow","1f610":"neutral",
+  "1f611":"expressionless","1f636":"no-mouth","1f60f":"smirk","1f612":"unamused",
+  "1f644":"eye-roll","1f62c":"grimace","1f925":"lying","1f60c":"relieved",
+  "1f614":"pensive","1f62a":"sleepy","1f924":"drool","1f634":"sleep",
+  "1f637":"mask","1f912":"thermometer","1f915":"head-bandage","1f922":"nauseated",
+  "1f92e":"vomit","1f927":"sneeze","1f975":"hot","1f976":"cold","1f974":"woozy",
+  "1f635":"dizzy","1f92f":"explode","1f920":"cowboy","1f973":"party",
+  "1f60e":"cool","1f913":"nerd","1f9d0":"monocle","1f615":"confused",
+  "1f61f":"worried","1f641":"slight-frown","1f62e":"open-mouth","1f62f":"hushed",
+  "1f632":"astonished","1f633":"flushed","1f97a":"pleading","1f626":"frowning",
+  "1f627":"anguished","1f628":"fearful","1f630":"anxious","1f625":"sad-relieved",
+  "1f622":"crying","1f62d":"cry","1f631":"scared","1f616":"confounded",
+  "1f623":"persevere","1f61e":"disappointed","1f613":"downcast","1f629":"weary",
+  "1f62b":"tired","1f971":"yawn","1f624":"triumph","1f621":"angry",
+  "1f620":"angry-face","1f92c":"cursing","1f47f":"imp","1f480":"skull",
+  "2620":"skull-bones","1f4a9":"poop","1f921":"clown","1f479":"ogre","1f47a":"goblin",
+  "1f47b":"ghost","1f47d":"alien","1f47e":"alien-monster","1f916":"robot",
+  "1f63a":"smiley-cat","1f638":"grin-cat","1f639":"tears-cat","1f63b":"heart-cat",
+  "1f63c":"smirk-cat","1f63d":"kiss-cat","1f640":"weary-cat","1f63f":"cry-cat",
+  "1f63e":"pouting-cat","1f48c":"love-letter","1f498":"heart-arrow",
+  "1f49d":"heart-ribbon","1f496":"sparkle-heart","1f497":"heart-grow",
+  "1f493":"heartbeat","1f49e":"revolving-hearts","1f495":"two-hearts",
+  "1f49f":"heart-box","2764":"heart","1f9e1":"orange-heart","1f49b":"yellow-heart",
+  "1f49a":"green-heart","1f499":"blue-heart","1f49c":"purple-heart",
+  "1f90e":"brown-heart","1f5a4":"black-heart","1f90d":"white-heart",
+  "1f494":"broken-heart","2763":"heart-exclamation","1f436":"dog","1f431":"cat",
+  "1f42d":"mouse","1f439":"hamster","1f430":"bunny","1f98a":"fox","1f43b":"bear",
+  "1f43c":"panda","1f428":"koala","1f42f":"tiger","1f981":"lion","1f42e":"cow",
+  "1f437":"pig","1f438":"frog","1f435":"monkey","1f414":"chicken","1f427":"penguin",
+  "1f426":"bird","1f424":"chick","1f986":"duck","1f985":"eagle","1f989":"owl",
+  "1f987":"bat","1f43a":"wolf","1f417":"boar","1f434":"horse","1f984":"unicorn",
+  "1f41d":"bee","1f41b":"bug","1f98b":"butterfly","1f40c":"snail","1f41e":"ladybug",
+  "1f41c":"ant","1f99f":"mosquito","1f997":"cricket","1f577":"spider",
+  "1f982":"scorpion","1f422":"turtle","1f40d":"snake","1f98e":"lizard",
+  "1f996":"t-rex","1f995":"sauropod","1f419":"octopus","1f991":"squid",
+  "1f990":"shrimp","1f99e":"lobster","1f420":"tropical-fish","1f41f":"fish",
+  "1f421":"blowfish","1f988":"shark","1f433":"whale","1f40b":"humpback-whale",
+  "1f42c":"dolphin","1f355":"pizza","1f354":"burger","1f35f":"fries",
+  "1f32d":"hotdog","1f37f":"popcorn","1f953":"bacon","1f95a":"egg",
+  "1f95e":"pancakes","1f35e":"bread","1f950":"croissant","1f968":"pretzel",
+  "1f9c0":"cheese","1f957":"salad","1f32e":"taco","1f32f":"burrito",
+  "1f96a":"sandwich","1f35c":"ramen","1f35d":"spaghetti","1f363":"sushi",
+  "1f364":"fried-shrimp","1f35a":"rice","1f371":"bento","1f35b":"curry",
+  "1f372":"stew","1f356":"meat","1f357":"chicken-leg","1f969":"steak",
+  "1f366":"icecream","1f367":"shaved-ice","1f368":"ice-cream-bowl",
+  "1f369":"doughnut","1f36a":"cookie","1f382":"cake","1f370":"cake-slice",
+  "1f9c1":"cupcake","1f967":"pie","1f36b":"chocolate","1f36c":"candy",
+  "1f36d":"lollipop","1f36e":"custard","1f36f":"honey","26bd":"soccer",
+  "1f3c0":"basketball","1f3c8":"football","26be":"baseball","1f3be":"tennis",
+  "1f3b1":"billiards","1f3af":"bullseye","1f3ae":"videogame","1f3b8":"guitar",
+  "1f3b9":"piano","1f941":"drum","1f3b7":"sax","1f3ba":"trumpet","1f3bb":"violin",
+  "1f3a4":"microphone","1f3a7":"headphone","1f4f7":"camera","1f4f8":"camera-flash",
+  "1f4bb":"laptop","1f4f1":"phone","1f4a1":"idea","1f526":"flashlight",
+  "1f4b0":"money-bag","1f48e":"diamond","1f511":"key","1f381":"gift",
+  "1f388":"balloon","1f389":"party","1f38a":"confetti","1f4af":"100",
+  "1f525":"fire","2b50":"star","1f31f":"star-glow","2728":"sparkles",
+  "1f308":"rainbow","2600":"sunshine","1f319":"moon","26a1":"lightning",
+  "1f4a7":"droplet","1f44d":"like","1f44e":"dislike","1f44f":"clap",
+  "1f64c":"raised-hands","1f44a":"punch","270b":"raised-hand","1f44c":"ok-hand",
+  "1f449":"right-point","1f446":"up-point","1f447":"down-point","270c":"peace",
+  "1f918":"rock-on","1f697":"red-car","1f695":"taxi","1f693":"police-car",
+  "1f691":"ambulance","1f692":"fire-engine","1f69c":"tractor","1f6f5":"scooter",
+  "1f6b2":"bicycle","1f681":"helicopter","2708":"airplane","1f680":"rocket",
+  "26f5":"sailboat","1f6a2":"ship","1f33b":"sunflower","1f338":"cherry",
+  "1f339":"rose","1f33a":"hibiscus","1f337":"tulip","1f490":"bouquet",
+  "1f33f":"herb","1f340":"clover","1f335":"cactus","1f334":"palm","1f333":"deciduous",
+  "1f332":"evergreen","1f341":"maple-leaf","1f342":"fallen-leaf","2601":"cloud",
+  "2744":"snowflake","2603":"snowman","1f30a":"wave"
+};
+
 // ---------- LOGGER ----------
 const logger = {
   info: (m,d) => { if(window.location.hostname.includes('localhost')) console.info(`[EK] ${m}`,d||''); },
@@ -141,7 +214,7 @@ const logger = {
 const state = {
   mixSel1: emojiList[0], mixSel2: emojiList[1],
   currentVoteCombo: null,
-  votes: parseInt(localStorage.getItem('emoji_kitchen_votes')||'0',10),
+  votes: parseInt(localStorage.getItem('ek_votes')||'0',10),
   storyPairs: [], gameAnswer: {}, gameScore: 0,
   isRendering: false, aiRequestInFlight: false, renderToken: 0
 };
@@ -154,17 +227,16 @@ function createSafeObjectURL(b) { const u=URL.createObjectURL(b); objectURLs.add
 function revokeObjectURLSafe(u) { if(u&&objectURLs.has(u)){URL.revokeObjectURL(u);objectURLs.delete(u);} }
 function cleanupAllObjectURLs() { objectURLs.forEach(u=>{try{URL.revokeObjectURL(u)}catch(e){}}); objectURLs.clear(); }
 
-function evictStaleCache() {
-  const now=Date.now(), toDelete=[];
-  for(const [k,e] of emojiCache) if(now-e.t>600000) toDelete.push(k);
-  if(emojiCache.size-toDelete.length>250){
-    const s=[...emojiCache].filter(([k])=>!toDelete.includes(k)).sort((a,b)=>a[1].t-b[1].t);
-    s.slice(0,s.length-250).forEach(([k])=>toDelete.push(k));
+setInterval(()=>{
+  const now=Date.now(),td=[];
+  for(const[k,e]of emojiCache) if(now-e.t>600000) td.push(k);
+  if(emojiCache.size-td.length>250){
+    const s=[...emojiCache].filter(([k])=>!td.includes(k)).sort((a,b)=>a[1].t-b[1].t);
+    s.slice(0,s.length-250).forEach(([k])=>td.push(k));
   }
-  toDelete.forEach(k=>{ const e=emojiCache.get(k); if(e?.u) revokeObjectURLSafe(e.u); emojiCache.delete(k); });
-}
-setInterval(evictStaleCache,300000);
-document.addEventListener('visibilitychange',()=>{if(document.hidden){evictStaleCache();moodCache.clear();}});
+  td.forEach(k=>{ const e=emojiCache.get(k); if(e?.u) revokeObjectURLSafe(e.u); emojiCache.delete(k); });
+},300000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden){moodCache.clear();}});
 
 // ---------- DOM ----------
 const domCache=new Map();
@@ -175,9 +247,9 @@ const setBtns=(ids,d)=>{ids.forEach(i=>{const b=getEl(i);if(b)b.disabled=d;});};
 
 // ---------- STORAGE ----------
 const storage={
-  get(k,f=null){try{const v=localStorage.getItem('emoji_kitchen_'+k);return v?JSON.parse(v):f;}catch{return f;}},
-  set(k,v){try{localStorage.setItem('emoji_kitchen_'+k,JSON.stringify(v));return true;}catch{return false;}},
-  remove(k){try{localStorage.removeItem('emoji_kitchen_'+k);return true;}catch{return false;}}
+  get(k,f=null){try{const v=localStorage.getItem('ek_'+k);return v?JSON.parse(v):f;}catch{return f;}},
+  set(k,v){try{localStorage.setItem('ek_'+k,JSON.stringify(v));return true;}catch{return false;}},
+  remove(k){try{localStorage.removeItem('ek_'+k);return true;}catch{return false;}}
 };
 
 // ---------- API ----------
@@ -185,7 +257,7 @@ async function fetchEmojiMix(c1,c2){
   const key=`${c1}_${c2}`;
   if(emojiCache.has(key)){const e=emojiCache.get(key);e.t=Date.now();return e.u;}
   if(pendingFetches.has(key))return pendingFetches.get(key);
-  const url=`https://emojik.vercel.app/s/${c1}_${c2}?size=256`;
+  const url=`${CONFIG.EMOJI_API_BASE}/${c1}_${c2}?size=${CONFIG.EMOJI_SIZE}`;
   const fp=(async()=>{
     const ac=new AbortController(),tid=setTimeout(()=>ac.abort(),8000);
     try{
@@ -205,9 +277,9 @@ async function fetchWithRetry(fn,n=2){for(let i=0;i<=n;i++){try{return await fn(
 function playSound(){const s=getEl('mixSound');if(s){s.currentTime=0;s.play().catch(()=>{});}}
 
 // ---------- FAVORITES ----------
-function getFavs(){return storage.get('emojifavs',[]);}
-function saveFav(c1,c2){const f=getFavs();if(!f.some(x=>(x.c1===c1&&x.c2===c2)||(x.c1===c2&&x.c2===c1))){f.push({c1,c2,date:Date.now()});storage.set('emojifavs',f);renderFavorites();}}
-function removeFav(c1,c2){const f=getFavs().filter(x=>!((x.c1===c1&&x.c2===c2)||(x.c1===c2&&x.c2===c1)));storage.set('emojifavs',f);renderFavorites();}
+function getFavs(){return storage.get('favs',[]);}
+function saveFav(c1,c2){const f=getFavs();if(!f.some(x=>(x.c1===c1&&x.c2===c2)||(x.c1===c2&&x.c2===c1))){f.push({c1,c2,date:Date.now()});storage.set('favs',f);renderFavorites();}}
+function removeFav(c1,c2){const f=getFavs().filter(x=>!((x.c1===c1&&x.c2===c2)||(x.c1===c2&&x.c2===c1)));storage.set('favs',f);renderFavorites();}
 
 // ---------- THEME ----------
 function toggleDark(){const d=document.body.classList.toggle('neon-dark');const b=getEl('themeToggleFloat');if(b){b.textContent=d?'☀️':'🌓';b.setAttribute('aria-label',d?'Switch to light':'Switch to dark');}storage.set('theme',d?'dark':'light');}
@@ -227,8 +299,9 @@ function sel2(e){state.mixSel2=e;setText('mixSelected2',e.emoji);renderGrid('mix
 window.filterGrid=(id,q)=>{if(id==='mixGrid1')renderGrid('mixGrid1',state.mixSel1,sel1,q);else renderGrid('mixGrid2',state.mixSel2,sel2,q);};
 
 // ---------- SEO ----------
-const ENM={"1f525":"fire","2764":"heart","1f602":"laugh","1f60d":"love","1f970":"smile","1f618":"kiss","1f436":"dog","1f431":"cat","1f389":"party","1f382":"cake","1f47b":"ghost","1f680":"rocket","1f60a":"smile","1f62d":"cry","1f621":"angry","1f631":"scared","1f917":"hug","1f914":"think","1f60e":"cool","1f973":"party","1f634":"sleep","1f929":"star","1f607":"angel","1f92f":"explode","1f44d":"like","1f44e":"dislike","1f4af":"100","1f308":"rainbow","2b50":"star","1f355":"pizza","1f354":"burger","1f98a":"fox","1f43c":"panda","1f33b":"flower","1f338":"cherry","1f3b8":"guitar","26bd":"soccer","1f4a1":"idea","2615":"coffee","1f366":"icecream"};
-const SC={};function geN(c){if(!SC[c])SC[c]=ENM[c]||c;return SC[c];}
+const SC={};
+function geN(code){if(SC[code])return SC[code];const n=FRIENDLY_NAMES[code]||code;SC[code]=n;return n;}
+
 let lSU='';
 function updateSEO(){
   const s1=geN(state.mixSel1.code),s2=geN(state.mixSel2.code),nu=`/emoji-mix/${s1}-${s2}`;
@@ -320,10 +393,8 @@ function setupTabs(){const tc=getEl('tabNav');if(!tc)return;tc.addEventListener(
 // ---------- EVENTS ----------
 function setupEvents(){
   document.addEventListener('click',(e)=>{const t=e.target,id=t.id||t.closest('[id]')?.id;if(!id)return;const ids=['scrollToToolBtn','toggleDarkModeBtn','themeToggleFloat','randomMixBtn','mixDownload','mixDownloadCard','mixCopy','mixWhatsapp','mixSave','voteUpBtn','voteDownBtn','battleAgain','battleShare','storyReset','storyDownload','wallRefresh','gameSubmit','gameNew','aiGenerate','clearFavorites','shareToolBtn'];if(ids.includes(id)){e.preventDefault();handleBtn(id);}});
-  
-  // SEARCH - DIRECT EVENT LISTENERS (FIXED)
-  const s1=getEl('mixSearch1');if(s1)s1.addEventListener('input',(e)=>{const q=e.target.value;renderGrid('mixGrid1',state.mixSel1,sel1,q);});
-  const s2=getEl('mixSearch2');if(s2)s2.addEventListener('input',(e)=>{const q=e.target.value;renderGrid('mixGrid2',state.mixSel2,sel2,q);});
+  const s1=getEl('mixSearch1');if(s1)s1.addEventListener('input',(e)=>{renderGrid('mixGrid1',state.mixSel1,sel1,e.target.value);});
+  const s2=getEl('mixSearch2');if(s2)s2.addEventListener('input',(e)=>{renderGrid('mixGrid2',state.mixSel2,sel2,e.target.value);});
 }
 
 function handleBtn(id){
@@ -345,7 +416,7 @@ function handleBtn(id){
     case'gameSubmit':{const g1=getEl('gameGuess1')?.value,g2=getEl('gameGuess2')?.value;if(g1&&g2&&((g1===state.gameAnswer.c1&&g2===state.gameAnswer.c2)||(g1===state.gameAnswer.c2&&g2===state.gameAnswer.c1))){state.gameScore+=10;setText('gameFeedback','✅ Correct! +10');}else setText('gameFeedback','❌ Try again');setText('gameScore',state.gameScore);playSound();}break;
     case'gameNew':newPuzzle();break;
     case'aiGenerate':aiGen();break;
-    case'clearFavorites':storage.remove('emojifavs');renderFavorites();break;
+    case'clearFavorites':storage.remove('favs');renderFavorites();break;
     case'shareToolBtn':shareSite();break;
   }
 }
