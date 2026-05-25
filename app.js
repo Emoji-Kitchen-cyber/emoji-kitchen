@@ -19,27 +19,159 @@ const CONFIG = {
     VOTES: 'votes'
   },
   AI_TIMEOUT_MS: 15000,
-  CACHE_MAX_AGE_MS: 600000, // 10 minutes
+  CACHE_MAX_AGE_MS: 600000,
   CACHE_MAX_SIZE: 250,
   RENDER_DEBOUNCE_MS: 50
 };
 
-// ---------- DATA ----------
+// ---------- DATA (250+ Emojis) ----------
 const emojiList = Object.freeze([
-  { emoji:"😊", code:"1f60a" },{ emoji:"😂", code:"1f602" },{ emoji:"🥰", code:"1f970" },
-  { emoji:"😍", code:"1f60d" },{ emoji:"😘", code:"1f618" },{ emoji:"😭", code:"1f62d" },
-  { emoji:"😡", code:"1f621" },{ emoji:"😱", code:"1f631" },{ emoji:"🤗", code:"1f917" },
-  { emoji:"🤔", code:"1f914" },{ emoji:"😎", code:"1f60e" },{ emoji:"🥳", code:"1f973" },
-  { emoji:"😴", code:"1f634" },{ emoji:"🤩", code:"1f929" },{ emoji:"😇", code:"1f607" },
-  { emoji:"🤯", code:"1f92f" },{ emoji:"❤️", code:"2764" },{ emoji:"🔥", code:"1f525" },
-  { emoji:"👍", code:"1f44d" },{ emoji:"👎", code:"1f44e" },{ emoji:"🎉", code:"1f389" },
-  { emoji:"💯", code:"1f4af" },{ emoji:"🌈", code:"1f308" },{ emoji:"⭐", code:"2b50" },
-  { emoji:"🍕", code:"1f355" },{ emoji:"🍔", code:"1f354" },{ emoji:"🐶", code:"1f436" },
-  { emoji:"🐱", code:"1f431" },{ emoji:"🦊", code:"1f98a" },{ emoji:"🐼", code:"1f43c" },
-  { emoji:"🌻", code:"1f33b" },{ emoji:"🌸", code:"1f338" },{ emoji:"🎸", code:"1f3b8" },
-  { emoji:"⚽", code:"26bd" },{ emoji:"🚀", code:"1f680" },{ emoji:"💡", code:"1f4a1" },
-  { emoji:"🎂", code:"1f382" },{ emoji:"☕", code:"2615" },{ emoji:"🍦", code:"1f366" },
-  { emoji:"👻", code:"1f47b" }
+  // Smileys & People
+  { emoji:"😀", code:"1f600" },{ emoji:"😃", code:"1f603" },{ emoji:"😄", code:"1f604" },
+  { emoji:"😁", code:"1f601" },{ emoji:"😅", code:"1f605" },{ emoji:"🤣", code:"1f923" },
+  { emoji:"😂", code:"1f602" },{ emoji:"😊", code:"1f60a" },{ emoji:"😇", code:"1f607" },
+  { emoji:"🥰", code:"1f970" },{ emoji:"😍", code:"1f60d" },{ emoji:"🤩", code:"1f929" },
+  { emoji:"😘", code:"1f618" },{ emoji:"😗", code:"1f617" },{ emoji:"😚", code:"1f61a" },
+  { emoji:"😋", code:"1f60b" },{ emoji:"😛", code:"1f61b" },{ emoji:"😜", code:"1f61c" },
+  { emoji:"🤪", code:"1f92a" },{ emoji:"😝", code:"1f61d" },{ emoji:"🤑", code:"1f911" },
+  { emoji:"🤗", code:"1f917" },{ emoji:"🤭", code:"1f92d" },{ emoji:"🤫", code:"1f92b" },
+  { emoji:"🤔", code:"1f914" },{ emoji:"🤐", code:"1f910" },{ emoji:"🤨", code:"1f928" },
+  { emoji:"😐", code:"1f610" },{ emoji:"😑", code:"1f611" },{ emoji:"😶", code:"1f636" },
+  { emoji:"😏", code:"1f60f" },{ emoji:"😒", code:"1f612" },{ emoji:"🙄", code:"1f644" },
+  { emoji:"😬", code:"1f62c" },{ emoji:"🤥", code:"1f925" },{ emoji:"😌", code:"1f60c" },
+  { emoji:"😔", code:"1f614" },{ emoji:"😪", code:"1f62a" },{ emoji:"🤤", code:"1f924" },
+  { emoji:"😴", code:"1f634" },{ emoji:"😷", code:"1f637" },{ emoji:"🤒", code:"1f912" },
+  { emoji:"🤕", code:"1f915" },{ emoji:"🤢", code:"1f922" },{ emoji:"🤮", code:"1f92e" },
+  { emoji:"🤧", code:"1f927" },{ emoji:"🥵", code:"1f975" },{ emoji:"🥶", code:"1f976" },
+  { emoji:"🥴", code:"1f974" },{ emoji:"😵", code:"1f635" },{ emoji:"🤯", code:"1f92f" },
+  { emoji:"🤠", code:"1f920" },{ emoji:"🥳", code:"1f973" },{ emoji:"😎", code:"1f60e" },
+  { emoji:"🤓", code:"1f913" },{ emoji:"🧐", code:"1f9d0" },{ emoji:"😕", code:"1f615" },
+  { emoji:"😟", code:"1f61f" },{ emoji:"🙁", code:"1f641" },{ emoji:"😮", code:"1f62e" },
+  { emoji:"😯", code:"1f62f" },{ emoji:"😲", code:"1f632" },{ emoji:"😳", code:"1f633" },
+  { emoji:"🥺", code:"1f97a" },{ emoji:"😦", code:"1f626" },{ emoji:"😧", code:"1f627" },
+  { emoji:"😨", code:"1f628" },{ emoji:"😰", code:"1f630" },{ emoji:"😥", code:"1f625" },
+  { emoji:"😢", code:"1f622" },{ emoji:"😭", code:"1f62d" },{ emoji:"😱", code:"1f631" },
+  { emoji:"😖", code:"1f616" },{ emoji:"😣", code:"1f623" },{ emoji:"😞", code:"1f61e" },
+  { emoji:"😓", code:"1f613" },{ emoji:"😩", code:"1f629" },{ emoji:"😫", code:"1f62b" },
+  { emoji:"🥱", code:"1f971" },{ emoji:"😤", code:"1f624" },{ emoji:"😡", code:"1f621" },
+  { emoji:"😠", code:"1f620" },{ emoji:"🤬", code:"1f92c" },{ emoji:"👿", code:"1f47f" },
+  { emoji:"💀", code:"1f480" },{ emoji:"☠️", code:"2620" },{ emoji:"💩", code:"1f4a9" },
+  { emoji:"🤡", code:"1f921" },{ emoji:"👹", code:"1f479" },{ emoji:"👺", code:"1f47a" },
+  { emoji:"👻", code:"1f47b" },{ emoji:"👽", code:"1f47d" },{ emoji:"👾", code:"1f47e" },
+  { emoji:"🤖", code:"1f916" },{ emoji:"😺", code:"1f63a" },{ emoji:"😸", code:"1f638" },
+  { emoji:"😹", code:"1f639" },{ emoji:"😻", code:"1f63b" },{ emoji:"😼", code:"1f63c" },
+  { emoji:"😽", code:"1f63d" },{ emoji:"🙀", code:"1f640" },{ emoji:"😿", code:"1f63f" },
+  { emoji:"😾", code:"1f63e" },
+  
+  // Hearts & Emotions
+  { emoji:"💌", code:"1f48c" },{ emoji:"💘", code:"1f498" },{ emoji:"💝", code:"1f49d" },
+  { emoji:"💖", code:"1f496" },{ emoji:"💗", code:"1f497" },{ emoji:"💓", code:"1f493" },
+  { emoji:"💞", code:"1f49e" },{ emoji:"💕", code:"1f495" },{ emoji:"💟", code:"1f49f" },
+  { emoji:"❤️", code:"2764" },{ emoji:"🧡", code:"1f9e1" },{ emoji:"💛", code:"1f49b" },
+  { emoji:"💚", code:"1f49a" },{ emoji:"💙", code:"1f499" },{ emoji:"💜", code:"1f49c" },
+  { emoji:"🤎", code:"1f90e" },{ emoji:"🖤", code:"1f5a4" },{ emoji:"🤍", code:"1f90d" },
+  { emoji:"💔", code:"1f494" },{ emoji:"❣️", code:"2763" },
+  
+  // Animals
+  { emoji:"🐶", code:"1f436" },{ emoji:"🐱", code:"1f431" },{ emoji:"🐭", code:"1f42d" },
+  { emoji:"🐹", code:"1f439" },{ emoji:"🐰", code:"1f430" },{ emoji:"🦊", code:"1f98a" },
+  { emoji:"🐻", code:"1f43b" },{ emoji:"🐼", code:"1f43c" },{ emoji:"🐨", code:"1f428" },
+  { emoji:"🐯", code:"1f42f" },{ emoji:"🦁", code:"1f981" },{ emoji:"🐮", code:"1f42e" },
+  { emoji:"🐷", code:"1f437" },{ emoji:"🐸", code:"1f438" },{ emoji:"🐵", code:"1f435" },
+  { emoji:"🐔", code:"1f414" },{ emoji:"🐧", code:"1f427" },{ emoji:"🐦", code:"1f426" },
+  { emoji:"🐤", code:"1f424" },{ emoji:"🦆", code:"1f986" },{ emoji:"🦅", code:"1f985" },
+  { emoji:"🦉", code:"1f989" },{ emoji:"🦇", code:"1f987" },{ emoji:"🐺", code:"1f43a" },
+  { emoji:"🐗", code:"1f417" },{ emoji:"🐴", code:"1f434" },{ emoji:"🦄", code:"1f984" },
+  { emoji:"🐝", code:"1f41d" },{ emoji:"🐛", code:"1f41b" },{ emoji:"🦋", code:"1f98b" },
+  { emoji:"🐌", code:"1f40c" },{ emoji:"🐞", code:"1f41e" },{ emoji:"🐜", code:"1f41c" },
+  { emoji:"🦟", code:"1f99f" },{ emoji:"🦗", code:"1f997" },{ emoji:"🕷️", code:"1f577" },
+  { emoji:"🦂", code:"1f982" },{ emoji:"🐢", code:"1f422" },{ emoji:"🐍", code:"1f40d" },
+  { emoji:"🦎", code:"1f98e" },{ emoji:"🦖", code:"1f996" },{ emoji:"🦕", code:"1f995" },
+  { emoji:"🐙", code:"1f419" },{ emoji:"🦑", code:"1f991" },{ emoji:"🦐", code:"1f990" },
+  { emoji:"🦞", code:"1f99e" },{ emoji:"🐠", code:"1f420" },{ emoji:"🐟", code:"1f41f" },
+  { emoji:"🐡", code:"1f421" },{ emoji:"🦈", code:"1f988" },{ emoji:"🐳", code:"1f433" },
+  { emoji:"🐋", code:"1f40b" },{ emoji:"🐬", code:"1f42c" },
+  
+  // Food
+  { emoji:"🍕", code:"1f355" },{ emoji:"🍔", code:"1f354" },{ emoji:"🍟", code:"1f35f" },
+  { emoji:"🌭", code:"1f32d" },{ emoji:"🍿", code:"1f37f" },{ emoji:"🧂", code:"1f9c2" },
+  { emoji:"🥓", code:"1f953" },{ emoji:"🥚", code:"1f95a" },{ emoji:"🧇", code:"1f9c7" },
+  { emoji:"🥞", code:"1f95e" },{ emoji:"🧈", code:"1f9c8" },{ emoji:"🍞", code:"1f35e" },
+  { emoji:"🥐", code:"1f950" },{ emoji:"🥨", code:"1f968" },{ emoji:"🥯", code:"1f96f" },
+  { emoji:"🥖", code:"1f956" },{ emoji:"🧀", code:"1f9c0" },{ emoji:"🥗", code:"1f957" },
+  { emoji:"🥙", code:"1f959" },{ emoji:"🌮", code:"1f32e" },{ emoji:"🌯", code:"1f32f" },
+  { emoji:"🥪", code:"1f96a" },{ emoji:"🍜", code:"1f35c" },{ emoji:"🍝", code:"1f35d" },
+  { emoji:"🍣", code:"1f363" },{ emoji:"🍤", code:"1f364" },{ emoji:"🥡", code:"1f961" },
+  { emoji:"🍚", code:"1f35a" },{ emoji:"🍱", code:"1f371" },{ emoji:"🍘", code:"1f358" },
+  { emoji:"🍙", code:"1f359" },{ emoji:"🍛", code:"1f35b" },{ emoji:"🍲", code:"1f372" },
+  { emoji:"🥘", code:"1f958" },{ emoji:"🍖", code:"1f356" },{ emoji:"🍗", code:"1f357" },
+  { emoji:"🥩", code:"1f969" },{ emoji:"🍦", code:"1f366" },{ emoji:"🍧", code:"1f367" },
+  { emoji:"🍨", code:"1f368" },{ emoji:"🍩", code:"1f369" },{ emoji:"🍪", code:"1f36a" },
+  { emoji:"🎂", code:"1f382" },{ emoji:"🍰", code:"1f370" },{ emoji:"🧁", code:"1f9c1" },
+  { emoji:"🥧", code:"1f967" },{ emoji:"🍫", code:"1f36b" },{ emoji:"🍬", code:"1f36c" },
+  { emoji:"🍭", code:"1f36d" },{ emoji:"🍮", code:"1f36e" },{ emoji:"🍯", code:"1f36f" },
+  
+  // Activities & Objects
+  { emoji:"⚽", code:"26bd" },{ emoji:"🏀", code:"1f3c0" },{ emoji:"🏈", code:"1f3c8" },
+  { emoji:"⚾", code:"26be" },{ emoji:"🥎", code:"1f94e" },{ emoji:"🎾", code:"1f3be" },
+  { emoji:"🏐", code:"1f3d0" },{ emoji:"🎱", code:"1f3b1" },{ emoji:"🏓", code:"1f3d3" },
+  { emoji:"🏸", code:"1f3f8" },{ emoji:"🥅", code:"1f945" },{ emoji:"🏒", code:"1f3d2" },
+  { emoji:"🎣", code:"1f3a3" },{ emoji:"🎿", code:"1f3bf" },{ emoji:"⛸️", code:"26f8" },
+  { emoji:"🎯", code:"1f3af" },{ emoji:"🎮", code:"1f3ae" },{ emoji:"🎰", code:"1f3b0" },
+  { emoji:"🎲", code:"1f3b2" },{ emoji:"🎸", code:"1f3b8" },{ emoji:"🎹", code:"1f3b9" },
+  { emoji:"🥁", code:"1f941" },{ emoji:"🎷", code:"1f3b7" },{ emoji:"🎺", code:"1f3ba" },
+  { emoji:"🎻", code:"1f3bb" },{ emoji:"🎬", code:"1f3ac" },{ emoji:"🎤", code:"1f3a4" },
+  { emoji:"🎧", code:"1f3a7" },{ emoji:"🎼", code:"1f3bc" },{ emoji:"🎵", code:"1f3b5" },
+  { emoji:"🎶", code:"1f3b6" },{ emoji:"🎙️", code:"1f399" },{ emoji:"📷", code:"1f4f7" },
+  { emoji:"📸", code:"1f4f8" },{ emoji:"📹", code:"1f4f9" },{ emoji:"🎥", code:"1f3a5" },
+  { emoji:"📽️", code:"1f4fd" },{ emoji:"💻", code:"1f4bb" },{ emoji:"⌨️", code:"2328" },
+  { emoji:"🖥️", code:"1f5a5" },{ emoji:"🖨️", code:"1f5a8" },{ emoji:"🖱️", code:"1f5b1" },
+  { emoji:"📱", code:"1f4f1" },{ emoji:"💡", code:"1f4a1" },{ emoji:"🔦", code:"1f526" },
+  { emoji:"💰", code:"1f4b0" },{ emoji:"💎", code:"1f48e" },{ emoji:"🔮", code:"1f52e" },
+  { emoji:"🧿", code:"1f9ff" },{ emoji:"🔑", code:"1f511" },{ emoji:"🗝️", code:"1f5dd" },
+  { emoji:"🎁", code:"1f381" },{ emoji:"🎈", code:"1f388" },{ emoji:"🎉", code:"1f389" },
+  { emoji:"🎊", code:"1f38a" },{ emoji:"🎌", code:"1f38c" },{ emoji:"🎍", code:"1f38d" },
+  { emoji:"🎎", code:"1f38e" },{ emoji:"🏮", code:"1f3ee" },{ emoji:"🎐", code:"1f390" },
+  { emoji:"🧧", code:"1f9e7" },{ emoji:"🎀", code:"1f380" },{ emoji:"🎗️", code:"1f397" },
+  
+  // Symbols
+  { emoji:"💯", code:"1f4af" },{ emoji:"🔥", code:"1f525" },
+  { emoji:"⭐", code:"2b50" },{ emoji:"🌟", code:"1f31f" },{ emoji:"✨", code:"2728" },
+  { emoji:"💫", code:"1f4ab" },{ emoji:"🌈", code:"1f308" },{ emoji:"☀️", code:"2600" },
+  { emoji:"🌙", code:"1f319" },{ emoji:"⚡", code:"26a1" },{ emoji:"💧", code:"1f4a7" },
+  { emoji:"🎵", code:"1f3b5" },{ emoji:"🎶", code:"1f3b6" },{ emoji:"➕", code:"2795" },
+  { emoji:"➖", code:"2796" },{ emoji:"✖️", code:"2716" },{ emoji:"➗", code:"2797" },
+  { emoji:"💲", code:"1f4b2" },{ emoji:"💱", code:"1f4b1" },{ emoji:"©️", code:"00a9" },
+  { emoji:"®️", code:"00ae" },{ emoji:"™️", code:"2122" },{ emoji:"‼️", code:"203c" },
+  { emoji:"⁉️", code:"2049" },{ emoji:"❓", code:"2753" },{ emoji:"❔", code:"2754" },
+  { emoji:"👍", code:"1f44d" },{ emoji:"👎", code:"1f44e" },
+  { emoji:"👏", code:"1f44f" },{ emoji:"🙌", code:"1f64c" },{ emoji:"🤝", code:"1f91d" },
+  { emoji:"✊", code:"270a" },{ emoji:"👊", code:"1f44a" },{ emoji:"🤛", code:"1f91b" },
+  { emoji:"🤜", code:"1f91c" },{ emoji:"🖐️", code:"1f590" },{ emoji:"✋", code:"270b" },
+  { emoji:"👌", code:"1f44c" },{ emoji:"🤏", code:"1f90f" },{ emoji:"👈", code:"1f448" },
+  { emoji:"👉", code:"1f449" },{ emoji:"👆", code:"1f446" },{ emoji:"👇", code:"1f447" },
+  { emoji:"☝️", code:"261d" },{ emoji:"✌️", code:"270c" },{ emoji:"🤞", code:"1f91e" },
+  { emoji:"🤟", code:"1f91f" },{ emoji:"🤘", code:"1f918" },{ emoji:"🤙", code:"1f919" },
+  
+  // Transport
+  { emoji:"🚗", code:"1f697" },{ emoji:"🚕", code:"1f695" },{ emoji:"🚙", code:"1f699" },
+  { emoji:"🚌", code:"1f68c" },{ emoji:"🚎", code:"1f68e" },{ emoji:"🏎️", code:"1f3ce" },
+  { emoji:"🚓", code:"1f693" },{ emoji:"🚑", code:"1f691" },{ emoji:"🚒", code:"1f692" },
+  { emoji:"🚐", code:"1f690" },{ emoji:"🚚", code:"1f69a" },{ emoji:"🚛", code:"1f69b" },
+  { emoji:"🚜", code:"1f69c" },{ emoji:"🛵", code:"1f6f5" },{ emoji:"🏍️", code:"1f3cd" },
+  { emoji:"🛺", code:"1f6fa" },{ emoji:"🚲", code:"1f6b2" },{ emoji:"🛴", code:"1f6f4" },
+  { emoji:"🚁", code:"1f681" },{ emoji:"✈️", code:"2708" },{ emoji:"🚀", code:"1f680" },
+  { emoji:"🛸", code:"1f6f8" },{ emoji:"⛵", code:"26f5" },{ emoji:"🚤", code:"1f6a4" },
+  { emoji:"🛳️", code:"1f6f3" },{ emoji:"⛴️", code:"26f4" },{ emoji:"🚢", code:"1f6a2" },
+  
+  // Plants & Nature
+  { emoji:"🌻", code:"1f33b" },{ emoji:"🌸", code:"1f338" },{ emoji:"🌹", code:"1f339" },
+  { emoji:"🌺", code:"1f33a" },{ emoji:"🌷", code:"1f337" },{ emoji:"💐", code:"1f490" },
+  { emoji:"🌼", code:"1f33c" },{ emoji:"🌿", code:"1f33f" },{ emoji:"🍀", code:"1f340" },
+  { emoji:"🌵", code:"1f335" },{ emoji:"🌴", code:"1f334" },{ emoji:"🌳", code:"1f333" },
+  { emoji:"🌲", code:"1f332" },{ emoji:"🍁", code:"1f341" },{ emoji:"🍂", code:"1f342" },
+  { emoji:"🍃", code:"1f343" },{ emoji:"☁️", code:"2601" },
+  { emoji:"❄️", code:"2744" },{ emoji:"☃️", code:"2603" },{ emoji:"🌊", code:"1f30a" }
 ]);
 
 const trendingCombos = Object.freeze([
@@ -100,7 +232,6 @@ function cleanupAllObjectURLs() {
   objectURLs.clear();
 }
 
-// Timestamp-based cache eviction
 function evictStaleCache() {
   const now = Date.now();
   const toDelete = [];
@@ -109,7 +240,6 @@ function evictStaleCache() {
       toDelete.push(key);
     }
   }
-  // If still over limit, remove oldest first
   if (emojiCache.size - toDelete.length > CONFIG.CACHE_MAX_SIZE) {
     const sorted = [...emojiCache.entries()]
       .filter(([key]) => !toDelete.includes(key))
@@ -199,14 +329,12 @@ const storage = {
 async function fetchEmojiMix(code1, code2) {
   const cacheKey = `${code1}_${code2}`;
   
-  // Check cache first
   if (emojiCache.has(cacheKey)) {
     const entry = emojiCache.get(cacheKey);
-    entry.timestamp = Date.now(); // Refresh access time
+    entry.timestamp = Date.now();
     return entry.url;
   }
 
-  // Return pending promise if already in flight
   if (pendingFetches.has(cacheKey)) {
     return pendingFetches.get(cacheKey);
   }
@@ -329,7 +457,6 @@ function renderGrid(containerId, selected, onClick, searchQuery = '') {
     ? emojiList.filter(e => e.emoji.includes(query) || e.code.includes(query))
     : emojiList;
 
-  // Build new HTML string for faster rendering
   let html = '';
   filtered.forEach(e => {
     const selectedClass = (selected && e.code === selected.code) ? ' selected' : '';
@@ -339,7 +466,6 @@ function renderGrid(containerId, selected, onClick, searchQuery = '') {
 
   container.innerHTML = html;
 
-  // Attach event listeners using event delegation
   if (!container._hasDelegation) {
     container.addEventListener('click', (e) => {
       const item = e.target.closest('.emoji-item');
@@ -483,7 +609,6 @@ async function renderMix() {
   const spinner = getEl('mixSpinner');
   const buttons = ['mixDownload', 'mixDownloadCard', 'mixCopy', 'mixWhatsapp', 'mixSave'];
   
-  // Clear previous handlers
   clearImageHandlers(img);
   
   img.classList.remove('show');
@@ -686,7 +811,7 @@ async function loadWall() {
   const fragment = document.createDocumentFragment();
   
   for (let i = 0; i < CONFIG.WALL_ITEMS; i++) {
-    if (token !== wallRenderToken) return; // Cancel if new render started
+    if (token !== wallRenderToken) return;
     const e1 = emojiList[Math.floor(Math.random() * emojiList.length)];
     const e2 = emojiList[Math.floor(Math.random() * emojiList.length)];
     const div = document.createElement('div');
@@ -1122,7 +1247,6 @@ function init() {
 
   setText('voteCount', state.votes);
 
-  // Stagger heavy startup tasks
   scheduleLazyTask(() => loadWall(), 0);
   scheduleLazyTask(() => initDailyChallenge(), 50);
   scheduleLazyTask(() => loadTrending(), 100);
